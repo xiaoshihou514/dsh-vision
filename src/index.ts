@@ -6,8 +6,11 @@ import { VisionAdapter } from './adapter.ts'
 
 export { VisionAdapter } from './adapter.ts'
 export type { VisionAdapterOptions } from './adapter.ts'
-export { VisionDescriptionStore } from './descriptions.ts'
-export type { VisionDescription, VisionDescriptionRequest } from './descriptions.ts'
+export { VisionBackend } from './backend.ts'
+export type { VisionBackendRequest } from './backend.ts'
+export { DurableVisionDescriptionStore, descriptionCacheKey } from './durable-descriptions.ts'
+export { isVisionMessageSource, VisionDescriptionStore } from './descriptions.ts'
+export type { VisionDescription, VisionDescriptionRequest, VisionMessageSource } from './descriptions.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'vision-adapter'

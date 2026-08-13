@@ -10,9 +10,25 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    vision: VisionMessageSource
+  }
+}
+
+/** Durable provenance carried by the core user message that stores one description. */
+export interface VisionMessageSource {
+  kind: 'vision'
+  plugin: 'dsh-vision'
+  cacheKey: string
+  attachment: ImageAttachmentRef
+  model: string
+  promptVersion: string
+}
+
 /** Input needed to find or produce one durable image description. */
 export interface VisionDescriptionRequest {
-  /** Session whose log owns the description event. */
+  /** Session whose log owns the description message. */
   sessionId: NonNullable<GenerateOptions['sessionId']>
   /** Verified image bytes and canonical durable reference. */
   image: StoredImageAttachment
@@ -20,6 +36,8 @@ export interface VisionDescriptionRequest {
 
 /** Visual evidence persisted before it becomes visible to the downstream model. */
 export interface VisionDescription {
+  /** Stable derivation key for this attachment and analyzer configuration. */
+  cacheKey: string
   /** Reference described by this record. */
   attachment: ImageAttachmentRef
   /** Versioned local model identity, including quantization where relevant. */
@@ -30,9 +48,14 @@ export interface VisionDescription {
   text: string
 }
 
+/** Return whether a message source is a description persisted by this plugin. */
+export function isVisionMessageSource(source: { kind: string }): source is VisionMessageSource {
+  return source.kind === 'vision'
+}
+
 /**
  * Durable visual-description repository and inference owner.
- * Implementations append their session event before returning a newly produced value.
+ * Implementations append a core user message before returning newly produced evidence.
  */
 export abstract class VisionDescriptionStore extends Service {
   constructor(ctx: Context) {

@@ -14,6 +14,7 @@ import type {
   Message,
   StreamChunk,
 } from '@deepseek-ai/dsh-llm'
+import { isVisionMessageSource } from './descriptions.ts'
 import type { VisionDescription, VisionDescriptionStore } from './descriptions.ts'
 
 /** Constructor dependencies fixed for one adapter registration. */
@@ -81,7 +82,8 @@ async function transformMessages(
   options: GenerateOptions,
   dependencies: Pick<VisionAdapterOptions, 'attachments' | 'descriptions'>,
 ): Promise<Message[]> {
-  return Promise.all(options.messages.map(async message => ({
+  const visible = options.messages.filter(message => !isVisionMessageSource(message.source))
+  return Promise.all(visible.map(async message => ({
     ...message,
     content: await transformBlocks(message.content, options, dependencies),
   })))

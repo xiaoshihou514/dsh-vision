@@ -22,11 +22,11 @@ The selected Harness route will be owned by `dsh-vision` and advertise text plus
 
 1. Resolve every durable image through `ctx.attachments`.
 2. Derive an immutable cache key from the attachment digest, local vision model identity, prompt-template version, and inference settings.
-3. Reuse a matching `vision/description` event from the owning session, or run the local vision backend and append that event before downstream dispatch.
+3. Reuse a matching description message from the owning session, or run the local vision backend and append that message before downstream dispatch.
 4. Clone the frozen request, replace image blocks with clearly delimited textual visual evidence, and select the configured downstream DeepSeek route and model.
 5. Delegate through `ctx.llm.stream()` and forward its chunks unchanged.
 
-The transformation is reconstructable because the original image reference, the generated description, and its derivation identity are durable. Replaying the synthetic adapter performs the same replacement from the event without rerunning inference.
+The transformation is reconstructable because the original image reference, the generated description, and its derivation identity are durable. Descriptions use the core `user/message` event with a merge-extended `vision` message source. Harness persistence has a generated set of known event types, so an out-of-tree required `vision/description` event could not be resumed by the stock coordinator. Replaying the synthetic adapter filters the storage message, performs the same inline replacement, and does not rerun inference.
 
 ## Why not the alternatives
 

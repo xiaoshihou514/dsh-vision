@@ -121,4 +121,27 @@ describe('VisionAdapter', () => {
       descriptions: {} as VisionDescriptionStore,
     })).toThrow(expect.objectContaining({ code: 'VISION_RECURSIVE_ROUTE' }))
   })
+
+  it('filters persisted vision messages from downstream history', async () => {
+    const captured: GenerateOptions[] = []
+    const fixture = adapter(captured)
+    const options = request()
+    options.messages.push({
+      id: 'description-message',
+      role: 'user',
+      content: [{ type: 'text', text: 'persisted description' }],
+      source: {
+        kind: 'vision',
+        plugin: 'dsh-vision',
+        cacheKey: 'cache',
+        attachment,
+        model: 'local-vlm-q4',
+        promptVersion: 'observe-v1',
+      },
+    } as never)
+
+    await collect(fixture.adapter.stream(options))
+    expect(captured[0]?.messages).toHaveLength(1)
+    expect(captured[0]?.messages.some(message => message.source.kind === 'vision')).toBe(false)
+  })
 })
