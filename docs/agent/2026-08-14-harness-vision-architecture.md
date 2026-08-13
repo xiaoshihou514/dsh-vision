@@ -81,6 +81,10 @@ Harness already owns most storage and validation concerns. `dsh-tui` should late
 4. Installable Harness bundle and a keyless real-composition transcript proving first use and replay.
 5. `dsh-tui` integration for attachment selection, paste/drop feedback, model download progress, and failures.
 
+## Model boundary
+
+Descriptions and OCR may reproduce instruction-shaped text from an image. The adapter renders visual evidence as JSON, escapes `<`, `>`, and `&`, and labels the payload as untrusted observations. This prevents image text from closing the evidence delimiter. It does not make prompt injection impossible, so downstream agents must continue treating visual evidence as user-controlled conversation data.
+
 ## Open questions
 
 - Which session API is safe for an adapter to use while a step is active, and what event ordering constraints apply to an adapter-owned event appended between `step/start` and `assistant/message`?
