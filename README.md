@@ -7,7 +7,7 @@ Local image support for [DeepSeek Harness](https://github.com/deepseek-ai/deepse
 
 ## Status
 
-The current release is intended for testing on Linux x64 and Windows x64. Linux CPU inference and the full Harness plugin path are exercised locally. Windows is covered by CI and uses ONNX Runtime's prebuilt CPU binary, but still needs a recorded real-model run before the support claim can be considered complete.
+The current release supports Linux x64 and Windows x64. CPU inference, the packaged runtime, and the build are exercised on both operating systems. The full Harness plugin path is also tested on Linux.
 
 The default model download is 321 MB. On the development machine, the first description took 68.6 seconds including download and initialization. A warm detailed-caption and OCR run took 11.7 seconds. CPU speed varies considerably by machine.
 
