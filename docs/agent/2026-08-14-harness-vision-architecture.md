@@ -42,11 +42,13 @@ The first backend uses Transformers.js, ONNX Runtime, and the MIT-licensed `onnx
 
 This path requires no Python, system package manager, CUDA installation, or resident model server. ONNX Runtime publishes Node binaries for Linux and Windows. Its npm install currently downloads CUDA and TensorRT provider libraries on Linux even when the application uses CPU inference, however. That makes the installed dependency tree much larger than the CPU runtime requires. It is an unresolved packaging issue, not a runtime requirement, and must be measured and either reduced or documented before release.
 
-The Hugging Face revision pin prevents upstream movement, but the model cache still relies on the library's HTTP and cache behavior. A release-quality model manifest needs per-file digests and atomic validation before cached files are accepted.
+The default q4 cache has an embedded nine-file SHA-256 manifest. Cache mutation is serialized with a cross-process lock that uses Node filesystem calls on Linux and Windows. Known corrupt or interrupted files are removed before model loading so Transformers.js downloads them again, and every file is verified after download before the model becomes available. Custom model IDs, revisions, and non-q4 formats do not have a bundled manifest and therefore rely on the user-selected upstream source.
 
 ## Prototype evidence
 
-On 2026-08-14, the real backend was run on Linux against `assets/logo.png` with an empty cache in `/tmp`. The pinned q4 model downloaded and produced a detailed, image-specific caption in 68.6 seconds. The unit suite covers lazy singleton loading, q4 and revision options, post-processing, cancellation during generation, and retry after a failed load. Windows execution and warm-path timing remain unverified.
+On 2026-08-14, the real backend was run on Linux against `assets/logo.png` with an empty cache in `/tmp`. The pinned q4 model downloaded and produced a detailed, image-specific caption in 68.6 seconds. The downloaded model cache is 321 MB. A warm run with the default detailed-caption and OCR passes took 11.7 seconds and returned both visual detail and detected text. The unit suite covers lazy singleton loading, q4 and revision options, post-processing, OCR composition, cancellation during generation, retry after a failed load, cache repair, digest verification, and cross-process serialization. Windows execution remains unverified.
+
+The bundle was also installed through the Harness `dsh plugin --profile vision-test add <checkout>` path in an isolated `DSH_HOME`. Harness recognized the bundle manifest, composed its patch over `dsh-base`, selected `dsh-vision/deepseek-v4-flash` as the default model, resolved all three plugin entry points, and stayed running until an intentional interrupt.
 
 ## Reasonix findings
 

@@ -34,6 +34,7 @@ run('TransformersVisionBackend end to end', () => {
       cacheDir: process.env.DSH_VISION_E2E_CACHE ?? '.cache/e2e-models',
       maxNewTokens: DEFAULT_MAX_NEW_TOKENS,
       task: DEFAULT_TASK,
+      includeOcr: true,
     })
 
     const description = await backend.describe({ image })

@@ -1,0 +1,25 @@
+import { readFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import { parse } from 'yaml'
+
+describe('Harness bundle', () => {
+  it('declares and ships a parseable Cordis patch', async () => {
+    const root = resolve(import.meta.dirname, '..')
+    const manifest = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')) as {
+      dsh?: { bundle?: { patch?: string } }
+      files?: string[]
+      exports?: Record<string, unknown>
+    }
+    expect(manifest.dsh?.bundle?.patch).toBe('./cordis.patch.yml')
+    expect(manifest.files).toContain('cordis.patch.yml')
+    expect(manifest.exports).toHaveProperty('./cordis.patch.yml')
+
+    const patch = parse(await readFile(resolve(root, 'cordis.patch.yml'), 'utf8')) as unknown[]
+    expect(patch).toHaveLength(2)
+    expect(patch).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'agent-default-model' }),
+      expect.objectContaining({ insert: expect.any(Array) }),
+    ]))
+  })
+})

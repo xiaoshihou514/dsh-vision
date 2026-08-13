@@ -33,8 +33,8 @@ function runtimeFixture(): RuntimeFixture {
     {
       construct_prompts: vi.fn(() => ['Describe with detail.']),
       batch_decode: vi.fn(() => ['<s>A small chart with two bars.</s>']),
-      post_process_generation: vi.fn(() => ({
-        '<MORE_DETAILED_CAPTION>': 'A small chart with two bars.',
+      post_process_generation: vi.fn((_text, task: string) => ({
+        [task]: task === '<OCR>' ? 'Revenue 2026' : 'A small chart with two bars.',
       })),
     },
   )
@@ -73,7 +73,8 @@ function backend(fixture: RuntimeFixture): TransformersVisionBackend {
     cacheDir: '/tmp/dsh-vision-test-cache',
     maxNewTokens: 192,
     task: '<MORE_DETAILED_CAPTION>',
-  }, async () => fixture.runtime as never)
+    includeOcr: false,
+  }, async () => fixture.runtime as never, false)
 }
 
 describe('TransformersVisionBackend', () => {
@@ -96,6 +97,24 @@ describe('TransformersVisionBackend', () => {
       pixel_values: 'pixels',
     }))
     expect(subject.model).toContain(`${DEFAULT_MODEL_ID}@${DEFAULT_MODEL_REVISION}:q4`)
+  })
+
+  it('adds OCR evidence when enabled', async () => {
+    const fixture = runtimeFixture()
+    const subject = new TransformersVisionBackend(new Context(), {
+      modelId: DEFAULT_MODEL_ID,
+      revision: DEFAULT_MODEL_REVISION,
+      dtype: 'q4',
+      cacheDir: '/tmp/dsh-vision-test-cache',
+      maxNewTokens: 192,
+      task: '<MORE_DETAILED_CAPTION>',
+      includeOcr: true,
+    }, async () => fixture.runtime as never, false)
+
+    await expect(subject.describe({ image })).resolves.toBe(
+      'A small chart with two bars.\n\nVisible text (OCR):\nRevenue 2026',
+    )
+    expect(fixture.generate).toHaveBeenCalledTimes(2)
   })
 
   it('interrupts token generation when the request is aborted', async () => {

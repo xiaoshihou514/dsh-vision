@@ -6,6 +6,13 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { VisionBackend } from './backend.ts'
 import type { VisionBackendRequest } from './backend.ts'
+import {
+  DEFAULT_Q4_MODEL_FILES,
+  discardCorruptModelFiles,
+  modelRevisionRoot,
+  verifyModelFiles,
+  withModelCacheLock,
+} from './model-cache.ts'
 
 /** Pinned model repository. */
 export const DEFAULT_MODEL_ID = 'onnx-community/Florence-2-base-ft'
@@ -44,6 +51,8 @@ export interface Config {
   maxNewTokens?: number
   /** Florence task prompt. */
   task?: '<CAPTION>' | '<DETAILED_CAPTION>' | '<MORE_DETAILED_CAPTION>' | '<OCR>'
+  /** Add a separate OCR pass after the visual description. */
+  includeOcr?: boolean
 }
 
 export const Config: z<Config> = z.object({
@@ -54,6 +63,7 @@ export const Config: z<Config> = z.object({
   maxNewTokens: z.number().step(1).min(1).max(1024).default(DEFAULT_MAX_NEW_TOKENS),
   task: z.union(['<CAPTION>', '<DETAILED_CAPTION>', '<MORE_DETAILED_CAPTION>', '<OCR>'] as const)
     .default(DEFAULT_TASK),
+  includeOcr: z.boolean().default(true),
 })
 
 function defaultCacheDir(): string {
@@ -86,10 +96,11 @@ export class TransformersVisionBackend extends VisionBackend {
     ctx: Context,
     private readonly config: Required<Omit<Config, 'cacheDir'>> & { cacheDir: string },
     private readonly loadRuntime: () => Promise<Transformers> = () => import('@huggingface/transformers'),
+    private readonly verifyDefaultModel = true,
   ) {
     super(ctx)
     this.model = `${config.modelId}@${config.revision}:${config.dtype}`
-    this.promptVersion = `florence2:${config.task}:tokens-${config.maxNewTokens}:v1`
+    this.promptVersion = `florence2:${config.task}:ocr-${config.includeOcr}:tokens-${config.maxNewTokens}:v2`
   }
 
   override describe(request: VisionBackendRequest): Promise<string> {
@@ -105,28 +116,40 @@ export class TransformersVisionBackend extends VisionBackend {
     const loaded = await waitFor(this.load(), request.signal)
     const bytes = request.image.data.slice().buffer as ArrayBuffer
     const image = await loaded.runtime.RawImage.fromBlob(new Blob([bytes], { type: request.image.ref.mediaType }))
-    const prompts = loaded.processor.construct_prompts(this.config.task)
+    const describe = await this.runTask(loaded, image, this.config.task, request.signal)
+    if (!this.config.includeOcr || this.config.task === '<OCR>') return describe
+    const ocr = await this.runTask(loaded, image, '<OCR>', request.signal)
+    return ocr.length === 0 ? describe : `${describe}\n\nVisible text (OCR):\n${ocr}`
+  }
+
+  private async runTask(
+    loaded: LoadedFlorence,
+    image: Awaited<ReturnType<Transformers['RawImage']['fromBlob']>>,
+    task: Config['task'] & string,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const prompts = loaded.processor.construct_prompts(task)
     const inputs = await loaded.processor(image, prompts)
     const stopping = new loaded.runtime.InterruptableStoppingCriteria()
     const criteria = new loaded.runtime.StoppingCriteriaList()
     criteria.push(stopping)
     const abort = (): void => stopping.interrupt()
-    request.signal?.addEventListener('abort', abort, { once: true })
+    signal?.addEventListener('abort', abort, { once: true })
     try {
       const generated = await loaded.model.generate({
         ...inputs,
         max_new_tokens: this.config.maxNewTokens,
         stopping_criteria: criteria,
       })
-      if (request.signal?.aborted) throw abortReason(request.signal)
+      if (signal?.aborted) throw abortReason(signal)
       const decoded = loaded.processor.batch_decode(generated, { skip_special_tokens: false })[0]
       if (decoded === undefined) throw new Error('Florence-2 returned no decoded output')
-      const result = loaded.processor.post_process_generation(decoded, this.config.task, image.size)
-      const text = result[this.config.task]
-      if (typeof text !== 'string') throw new Error(`Florence-2 returned an unsupported result for ${this.config.task}`)
+      const result = loaded.processor.post_process_generation(decoded, task, image.size)
+      const text = result[task]
+      if (typeof text !== 'string') throw new Error(`Florence-2 returned an unsupported result for ${task}`)
       return text.trim()
     } finally {
-      request.signal?.removeEventListener('abort', abort)
+      signal?.removeEventListener('abort', abort)
     }
   }
 
@@ -139,19 +162,28 @@ export class TransformersVisionBackend extends VisionBackend {
   }
 
   private async loadFresh(): Promise<LoadedFlorence> {
-    const runtime = await this.loadRuntime()
-    const options = {
-      cache_dir: this.config.cacheDir,
-      revision: this.config.revision,
-    }
-    const [model, processor] = await Promise.all([
-      runtime.Florence2ForConditionalGeneration.from_pretrained(this.config.modelId, {
-        ...options,
-        dtype: this.config.dtype,
-      }),
-      runtime.AutoProcessor.from_pretrained(this.config.modelId, options),
-    ])
-    return { model, processor: processor as FlorenceProcessor, runtime }
+    return withModelCacheLock(this.config.cacheDir, async () => {
+      const runtime = await this.loadRuntime()
+      const options = {
+        cache_dir: this.config.cacheDir,
+        revision: this.config.revision,
+      }
+      const verifiesDefault = this.verifyDefaultModel
+        && this.config.modelId === DEFAULT_MODEL_ID
+        && this.config.revision === DEFAULT_MODEL_REVISION
+        && this.config.dtype === 'q4'
+      const revisionRoot = modelRevisionRoot(this.config.cacheDir, this.config.modelId, this.config.revision)
+      if (verifiesDefault) await discardCorruptModelFiles(revisionRoot, DEFAULT_Q4_MODEL_FILES)
+      const [model, processor] = await Promise.all([
+        runtime.Florence2ForConditionalGeneration.from_pretrained(this.config.modelId, {
+          ...options,
+          dtype: this.config.dtype,
+        }),
+        runtime.AutoProcessor.from_pretrained(this.config.modelId, options),
+      ])
+      if (verifiesDefault) await verifyModelFiles(revisionRoot, DEFAULT_Q4_MODEL_FILES)
+      return { model, processor: processor as FlorenceProcessor, runtime }
+    })
   }
 }
 
@@ -167,5 +199,6 @@ export function apply(ctx: Context, config: Config): void {
     cacheDir: resolve(config.cacheDir ?? defaultCacheDir()),
     maxNewTokens: config.maxNewTokens ?? DEFAULT_MAX_NEW_TOKENS,
     task: config.task ?? DEFAULT_TASK,
+    includeOcr: config.includeOcr ?? true,
   })
 }
