@@ -11,6 +11,13 @@ export type { VisionBackendRequest } from './backend.ts'
 export { DurableVisionDescriptionStore, descriptionCacheKey } from './durable-descriptions.ts'
 export { isVisionMessageSource, VisionDescriptionStore } from './descriptions.ts'
 export type { VisionDescription, VisionDescriptionRequest, VisionMessageSource } from './descriptions.ts'
+export {
+  DEFAULT_MAX_NEW_TOKENS,
+  DEFAULT_MODEL_ID,
+  DEFAULT_MODEL_REVISION,
+  DEFAULT_TASK,
+  TransformersVisionBackend,
+} from './transformers-backend.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'vision-adapter'

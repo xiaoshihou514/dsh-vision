@@ -38,9 +38,15 @@ The transformation is reconstructable because the original image reference, the 
 
 ## Local runtime direction
 
-The backend will be an interface owned by the adapter package. The initial implementation should ship platform-specific native artifacts through npm optional packages, following established native npm packaging patterns, and download a pinned model artifact on first use into a versioned cache below `DSH_HOME`. The executable and its runtime libraries are part of the package; the model is verified by digest before publication into the cache.
+The first backend uses Transformers.js, ONNX Runtime, and the MIT-licensed `onnx-community/Florence-2-base-ft` model. The repository revision is pinned to `e88a44eaf3791a35eae0c5a47b3dbcd36e67eb6f`; q4 weights are the default. Model files are downloaded on first use into `DSH_HOME/models/dsh-vision`, or the configured cache directory. The runtime is lazy-loaded and inference is serialized so simultaneous requests do not duplicate model loading or saturate a CPU host.
 
-The exact engine and model remain an implementation choice until a focused prototype measures startup time, CPU latency, memory, OCR quality, general visual description quality, artifact size, and Windows deployment behavior. The candidates should support a single portable model format on x64 Linux and x64 Windows and must not require Python, CUDA, Visual C++ redistributable installation, or a resident server. GPU acceleration is an optional later provider, not an initial correctness dependency.
+This path requires no Python, system package manager, CUDA installation, or resident model server. ONNX Runtime publishes Node binaries for Linux and Windows. Its npm install currently downloads CUDA and TensorRT provider libraries on Linux even when the application uses CPU inference, however. That makes the installed dependency tree much larger than the CPU runtime requires. It is an unresolved packaging issue, not a runtime requirement, and must be measured and either reduced or documented before release.
+
+The Hugging Face revision pin prevents upstream movement, but the model cache still relies on the library's HTTP and cache behavior. A release-quality model manifest needs per-file digests and atomic validation before cached files are accepted.
+
+## Prototype evidence
+
+On 2026-08-14, the real backend was run on Linux against `assets/logo.png` with an empty cache in `/tmp`. The pinned q4 model downloaded and produced a detailed, image-specific caption in 68.6 seconds. The unit suite covers lazy singleton loading, q4 and revision options, post-processing, cancellation during generation, and retry after a failed load. Windows execution and warm-path timing remain unverified.
 
 ## Reasonix findings
 

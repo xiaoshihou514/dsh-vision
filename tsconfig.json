@@ -9,6 +9,7 @@
     "noEmit": true,
     "noUncheckedIndexedAccess": true,
     "rootDir": ".",
+    "skipLibCheck": true,
     "strict": true,
     "target": "ES2023",
     "types": ["node", "vitest/globals"],

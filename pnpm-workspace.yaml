@@ -1,5 +1,8 @@
 allowBuilds:
   esbuild: false
+  onnxruntime-node: true
+  protobufjs: false
+  sharp: true
 minimumReleaseAgeExclude:
   - '@deepseek-ai/cordis@4.0.1'
   - '@deepseek-ai/dsh-attachment@0.1.0-rc.6'
