@@ -1,0 +1,82 @@
+# Harness vision architecture
+
+## Goal
+
+`dsh-vision` makes a text-only DeepSeek route accept image-bearing Harness conversations without replacing the Harness attachment, session, agent-loop, or provider implementations. The first supported hosts are Linux and Windows. Local inference must run without Python, a system package manager, or a separately installed model server.
+
+## Harness findings
+
+- Harness already has a complete image attachment seam. `@deepseek-ai/dsh-attachment` defines durable image references and `@deepseek-ai/dsh-attachment-local` validates, content-addresses, stores, and reads PNG, JPEG, WebP, and GIF data below `DSH_HOME`.
+- `ContentBlock` already includes an `image` block containing a durable `ImageAttachmentRef`. Image blocks are valid session-log content rather than UI-only state.
+- The pi-ai adapter resolves durable references only at provider dispatch. Provider model metadata declares `inputModalities`; Harness refuses images before dispatch when the selected model is text-only.
+- DeepSeek's official chat-completions route is intentionally declared text-only and cannot be changed through provider settings.
+- Loop-built `GenerateOptions` are deep-frozen before the `llm/stream` waterfall. Middleware may inspect or replace the stream, but it must not mutate messages. This is a deliberate replay invariant.
+- An `LlmAdapter` owns one or more provider route names and receives the complete provider-neutral request. It may yield another `AsyncIterable<StreamChunk>`, which allows a wrapper adapter to delegate a cloned request through `ctx.llm.stream()` to a different route.
+- Anything model-visible must be reconstructable from the session log. A generated caption or OCR result cannot live only in an adapter cache.
+
+## Decision
+
+Implement `dsh-vision` as a synthetic vision-capable LLM adapter, not as `llm/stream` mutation and not as a replacement attachment store.
+
+The selected Harness route will be owned by `dsh-vision` and advertise text plus image input. Its configuration names the downstream text route and model. For each image-bearing request the adapter will:
+
+1. Resolve every durable image through `ctx.attachments`.
+2. Derive an immutable cache key from the attachment digest, local vision model identity, prompt-template version, and inference settings.
+3. Reuse a matching `vision/description` event from the owning session, or run the local vision backend and append that event before downstream dispatch.
+4. Clone the frozen request, replace image blocks with clearly delimited textual visual evidence, and select the configured downstream DeepSeek route and model.
+5. Delegate through `ctx.llm.stream()` and forward its chunks unchanged.
+
+The transformation is reconstructable because the original image reference, the generated description, and its derivation identity are durable. Replaying the synthetic adapter performs the same replacement from the event without rerunning inference.
+
+## Why not the alternatives
+
+- Changing DeepSeek model metadata to claim image input would let binary content reach an endpoint that does not accept it.
+- Rewriting in `llm/stream` conflicts with frozen loop requests and would bypass the Harness reconstruction invariant.
+- Injecting captions only into the system prompt loses message ordering and image-to-turn association.
+- Exposing vision only as a tool does not make attached images naturally available to the current user turn, and tool-returned images still reach the same text-only provider limitation.
+- Storing captions only in a process cache makes resume, retry, and audit depend on nondurable state.
+
+## Local runtime direction
+
+The backend will be an interface owned by the adapter package. The initial implementation should ship platform-specific native artifacts through npm optional packages, following established native npm packaging patterns, and download a pinned model artifact on first use into a versioned cache below `DSH_HOME`. The executable and its runtime libraries are part of the package; the model is verified by digest before publication into the cache.
+
+The exact engine and model remain an implementation choice until a focused prototype measures startup time, CPU latency, memory, OCR quality, general visual description quality, artifact size, and Windows deployment behavior. The candidates should support a single portable model format on x64 Linux and x64 Windows and must not require Python, CUDA, Visual C++ redistributable installation, or a resident server. GPU acceleration is an optional later provider, not an initial correctness dependency.
+
+## Reasonix findings
+
+Reasonix is useful UI and safety prior art, but it does not implement the proposed text-model bridge. It passes images natively to providers marked vision-capable.
+
+Relevant behavior to retain:
+
+- pasted images are copied into owned storage rather than retaining arbitrary source paths;
+- image bytes and media types are verified, symlinks are rejected, and request-sized images are bounded;
+- oversized inputs are downscaled for vision transport;
+- Linux clipboard image paste currently relies on `wl-paste` or `xclip`, while Windows uses PowerShell and `System.Drawing`;
+- native provider serializers attach images to user messages and move tool-result images into a following user message when the provider wire format requires it.
+
+Harness already owns most storage and validation concerns. `dsh-tui` should later add file, drag/drop, and clipboard ingestion through the Harness attachment service; those UI actions are outside this repository.
+
+## Initial package boundaries
+
+- `adapter`: synthetic provider metadata, request transformation, downstream delegation, and stream forwarding.
+- `descriptions`: durable event schema, cache-key derivation, session lookup, and append-before-use behavior.
+- `backend`: cancellation-aware local inference interface and native-process lifecycle.
+- `model-store`: pinned manifest, resumable download, digest verification, atomic publication, and cache discovery.
+- `prompt`: versioned visual-analysis instructions and stable text rendering.
+- `bundle`: Cordis patch that layers the attachment backend and vision adapter over a Harness base bundle.
+
+## First milestones
+
+1. Package scaffold plus a fake backend proving image-to-text request transformation, downstream routing, cancellation, and event reuse.
+2. Native backend spike on CPU for Linux x64 and Windows x64, with benchmark fixtures covering screenshots, diagrams, documents, and photographs.
+3. Verified model download and cache lifecycle with interrupted-download recovery and concurrent-start locking.
+4. Installable Harness bundle and a keyless real-composition transcript proving first use and replay.
+5. `dsh-tui` integration for attachment selection, paste/drop feedback, model download progress, and failures.
+
+## Open questions
+
+- Which session API is safe for an adapter to use while a step is active, and what event ordering constraints apply to an adapter-owned event appended between `step/start` and `assistant/message`?
+- Should one description be a neutral exhaustive observation or be conditioned on the user's prompt? Neutral descriptions maximize reuse; prompt-conditioned analysis may be materially better for charts, OCR, and spatial questions.
+- Should multiple images be analyzed independently, jointly, or both? Independent records cache well; joint analysis preserves comparisons and cross-image references.
+- How should compaction retain descriptions and their association with image blocks?
+- Does the initial model license permit automatic download and the intended redistribution path for native artifacts and tokenizer/config files?
