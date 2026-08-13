@@ -50,6 +50,8 @@ On 2026-08-14, the real backend was run on Linux against `assets/logo.png` with 
 
 The bundle was also installed through the Harness `dsh plugin --profile vision-test add <checkout>` path in an isolated `DSH_HOME`. Harness recognized the bundle manifest, composed its patch over `dsh-base`, selected `dsh-vision/deepseek-v4-flash` as the default model, resolved all three plugin entry points, and stayed running until an intentional interrupt.
 
+GitHub Actions run `31722947943` repeated the cold real-model test on hosted Linux x64 and Windows x64 runners. Both jobs downloaded and verified the pinned model, loaded the native CPU runtime, decoded the same PNG, ran detailed caption and OCR, and returned the same image-specific result. The test itself took 263.7 seconds on Linux and 248.4 seconds on Windows. The complete jobs took 4 minutes 39 seconds and 5 minutes 4 seconds respectively.
+
 ## Reasonix findings
 
 Reasonix is useful UI and safety prior art, but it does not implement the proposed text-model bridge. It passes images natively to providers marked vision-capable.
