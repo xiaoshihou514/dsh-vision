@@ -32,7 +32,7 @@
     "build": "tsdown",
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "prepare": "pnpm run build"
+    "prepack": "pnpm run build"
   },
   "engines": {
     "node": "^22.19.0 || >=24"
@@ -63,5 +63,15 @@
     "vitest": "^3.2.4",
     "yaml": "^2.9.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xiaoshihou514/dsh-vision.git"
+  },
+  "homepage": "https://github.com/xiaoshihou514/dsh-vision#readme",
+  "bugs": "https://github.com/xiaoshihou514/dsh-vision/issues",
+  "keywords": ["deepseek", "deepseek-harness", "vision", "multimodal", "florence-2"],
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -1,0 +1,2 @@
+import { a as name, i as inject, n as apply, r as descriptionCacheKey, t as DurableVisionDescriptionStore } from "./durable-descriptions-FkK0v2TF.js";
+export { DurableVisionDescriptionStore, apply, descriptionCacheKey, inject, name };
