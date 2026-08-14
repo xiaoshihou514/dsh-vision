@@ -10,10 +10,6 @@
       "types": "./lib/index.d.ts",
       "default": "./lib/index.js"
     },
-    "./durable-descriptions": {
-      "types": "./lib/durable-descriptions.d.ts",
-      "default": "./lib/durable-descriptions.js"
-    },
     "./qwen-backend": {
       "types": "./lib/qwen-backend.d.ts",
       "default": "./lib/qwen-backend.js"
@@ -65,7 +61,6 @@
         "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-settings",
         "@deepseek-ai/dsh-client-ui-settings-plugins"
       ]
     }
@@ -103,7 +98,6 @@
     "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-client-ui-conversation": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-client-ui-settings": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.0-rc.6"
   },
   "license": "MIT",

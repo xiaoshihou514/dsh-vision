@@ -1,7 +1,6 @@
 /** Browser half: composer upload-and-recognize entry. @module dsh-vision/client */
 
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
@@ -9,10 +8,11 @@ import type { IApiClient } from '@deepseek-ai/dsh-client-connection/client'
 import { UploadButton } from './UploadButton.tsx'
 import type { UploadButtonInjected } from './UploadButton.tsx'
 import { VisionSettingsCard } from './VisionSettingsCard.tsx'
-import type { VisionSettings, VisionSettingsCardInjected } from './VisionSettingsCard.tsx'
+import type { VisionSettingsCardInjected } from './VisionSettingsCard.tsx'
+import { VisionSettingsScope } from './vision-settings.ts'
 
 /** Required services (fiber inject). */
-export const inject = ['connection', 'settingsScope', 'slots']
+export const inject = ['connection', 'slots']
 
 /**
  * Mount the composer entry: an "upload image" control that translates the
@@ -30,7 +30,7 @@ export function apply(ctx: ClientContext): void {
       inject: (sessionId): UploadButtonInjected => ({ api, sessionId }),
     }, UploadButton))
   })
-  const settings = ctx.settingsScope.bind<VisionSettings>({ namespace: 'dsh-vision' })
+  const settings = new VisionSettingsScope()
   ctx.slots.inject('settings.plugin.item', function* () {
     yield ctx.slots.register({
       name: 'settings.plugin.item',

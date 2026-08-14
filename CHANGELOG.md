@@ -2,9 +2,10 @@
 
 ## Unreleased
 
-- Add an "upload and recognize image" composer entry: the browser posts image bytes to a dsh-vision HTTP endpoint, the GLM/Qwen backend returns evidence text, and that text is submitted as a plain-text message — no harness image admission applies, so any model on the session can answer without a synthetic vision route.
+- Add an "upload and recognize image" composer entry. It converts an image to text evidence before submitting the message, so it works with the model already selected for the session.
 - Add Zhipu's free GLM vision API as the default selectable backend, with secure WebUI credential setup and automatic free-model fallbacks; retain local Qwen as the private offline option.
-- Add a workspace-scoped `view_image` tool for text-only DeepSeek routes and expose both Flash and Pro through the image-capable wrapper.
+- Add a workspace-scoped `view_image` tool for text-only models.
+- Remove the synthetic vision provider and model copies. The plugin no longer changes the default model.
 
 ## 0.1.0 - 2026-08-14
 

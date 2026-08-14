@@ -6,7 +6,6 @@ await copyFile(new URL('assets/client.d.ts', root), new URL('client.d.ts', outpu
 
 const expected = [
   'client.d.ts', 'client.js',
-  'durable-descriptions.d.ts', 'durable-descriptions.js',
   'glm-backend.d.ts', 'glm-backend.js',
   'index.d.ts', 'index.js',
   'qwen-backend.d.ts', 'qwen-backend.js',

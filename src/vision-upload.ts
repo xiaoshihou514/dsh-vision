@@ -5,6 +5,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Context } from '@deepseek-ai/cordis'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import type { ImageMediaType, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
+import { settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type { SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import z from '@deepseek-ai/schemastery'
 
 declare module '@deepseek-ai/cordis' {
@@ -49,7 +51,7 @@ export const Config: z<Config> = z.object({
 export const name = 'vision-upload'
 
 /** Services required by the upload endpoint. */
-export const inject = ['visionBackend', 'webServer']
+export const inject = ['visionBackend', 'webServer', 'settings']
 
 /** One client-submitted translation request. */
 export interface UploadPayload {
@@ -170,4 +172,38 @@ export function apply(ctx: Context, config: Config): void {
     },
   }
   ctx.webServer.register(route)
+  ctx.webServer.register({
+    kind: 'exact',
+    path: '/dsh-vision/settings',
+    handler: async (req, res) => {
+      try {
+        if (req.headers[header] !== HEADER_VALUE) {
+          writeJson(res, 403, { ok: false, error: 'forbidden' })
+          return
+        }
+        const namespace = settingsNamespace('dsh-vision')
+        if (req.method === 'PATCH') {
+          const payload = await readJsonBody(req, 64 * 1024) as { ops?: SettingsPathOp[] }
+          if (!Array.isArray(payload.ops)) {
+            writeJson(res, 400, { ok: false, error: 'missing settings operations' })
+            return
+          }
+          await ctx.settings.mutate(namespace, payload.ops)
+        } else if (req.method !== 'GET') {
+          writeJson(res, 405, { ok: false, error: 'method not allowed' })
+          return
+        }
+        const descriptor = ctx.settings.describe({ redactSecrets: true })
+          .find(entry => entry.ns === namespace)
+        if (descriptor === undefined) {
+          writeJson(res, 503, { ok: false, error: 'vision settings are unavailable' })
+          return
+        }
+        writeJson(res, 200, { ok: true, value: descriptor.value })
+      } catch (error) {
+        ctx.logger('dsh-vision').warn('vision settings request failed: %s', error instanceof Error ? error.message : String(error))
+        writeJson(res, 400, { ok: false, error: error instanceof Error ? error.message : 'settings update failed' })
+      }
+    },
+  })
 }

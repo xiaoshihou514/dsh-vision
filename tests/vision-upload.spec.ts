@@ -18,17 +18,21 @@ class FakeVisionBackend extends VisionBackend {
 }
 
 interface RegisteredWebServer {
-  route: WebRouteShape
+  routes: Map<string, WebRouteShape>
 }
 
 function fixture(): { ctx: Context; server: RegisteredWebServer; backend: FakeVisionBackend } {
   const ctx = new Context()
   const backend = new FakeVisionBackend(ctx)
-  const server: RegisteredWebServer = { route: undefined as never }
+  const server: RegisteredWebServer = { routes: new Map() }
   Object.assign(ctx, {
+    settings: {
+      mutate: vi.fn(async () => undefined),
+      describe: vi.fn(() => [{ ns: 'dsh-vision', value: { backend: 'glm' } }]),
+    },
     webServer: {
       register: (r: WebRouteShape): (() => void) => {
-        server.route = r
+        server.routes.set(r.path, r)
         return () => undefined
       },
     },
@@ -71,10 +75,21 @@ function mockRequest(method: string, headers: Record<string, string>, payload: u
 }
 
 async function invoke(server: RegisteredWebServer, req: EventEmitter, res: MockResponse): Promise<void> {
-  await server.route.handler(req as never, res as never)
+  await server.routes.get('/dsh-vision/vision')!.handler(req as never, res as never)
 }
 
 describe('vision upload endpoint', () => {
+  it('reads plugin settings without registering an LLM provider', async () => {
+    const { server } = fixture()
+    const res = mockResponse()
+    await server.routes.get('/dsh-vision/settings')!.handler(
+      mockRequest('GET', { 'x-dsh-vision': 'dsh-vision' }, undefined) as never,
+      res as never,
+    )
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ ok: true, value: { backend: 'glm' } })
+  })
+
   it('translates a valid image and returns evidence text', async () => {
     const { server, backend } = fixture()
     const res = mockResponse()
@@ -141,11 +156,11 @@ describe('vision upload endpoint', () => {
     const backend = new class extends FakeVisionBackend {
       override async describe(): Promise<string> { return '   ' }
     }(ctx)
-    const server: RegisteredWebServer = { route: undefined as never }
+    const server: RegisteredWebServer = { routes: new Map() }
     Object.assign(ctx, {
       webServer: {
         register: (r: WebRouteShape): (() => void) => {
-          server.route = r
+          server.routes.set(r.path, r)
           return () => undefined
         },
       },

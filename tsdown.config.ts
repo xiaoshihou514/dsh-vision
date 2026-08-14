@@ -2,7 +2,7 @@ import { defineConfig } from 'tsdown'
 
 /** Platform module table entries the client bundle resolves through the loader require. */
 const CLIENT_EXTERNALS = ['react', 'react/jsx-runtime']
-const NODE_ENTRIES = ['index', 'durable-descriptions', 'qwen-backend', 'glm-backend', 'vision-tool', 'vision-upload'] as const
+const NODE_ENTRIES = ['index', 'qwen-backend', 'glm-backend', 'vision-tool', 'vision-upload'] as const
 
 export default defineConfig([
   ...NODE_ENTRIES.map(entry => ({

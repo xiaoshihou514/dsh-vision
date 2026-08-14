@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore, useState, type CSSProperties } from 'react'
 import type { IApiClient } from '@deepseek-ai/dsh-client-connection/client'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
+import type { VisionSettingsScope } from './vision-settings.ts'
 
 export interface VisionSettings {
   backend?: 'glm' | 'qwen'
@@ -20,7 +20,7 @@ export interface VisionSettings {
 }
 
 export interface VisionSettingsCardInjected {
-  scope: SettingsScope<VisionSettings>
+  scope: VisionSettingsScope
   api: Pick<IApiClient, 'credentials'>
 }
 

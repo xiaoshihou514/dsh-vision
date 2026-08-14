@@ -1,10 +1,4 @@
-# Add local image analysis in front of the stock DeepSeek text route.
-
-- id: agent-default-model
-  name: '@deepseek-ai/dsh-agent-default-model'
-  config:
-    provider: dsh-vision
-    model: deepseek-v4-flash
+# Add image analysis without replacing or wrapping the selected text model.
 
 - insert:
     - id: vision-qwen-backend
@@ -12,22 +6,8 @@
       config:
         backend: glm
 
-    - id: vision-descriptions
-      name: 'dsh-vision/durable-descriptions'
-
     - id: vision-tool
       name: 'dsh-vision/vision-tool'
 
     - id: vision-upload
       name: 'dsh-vision/vision-upload'
-
-    - id: vision-adapter
-      name: 'dsh-vision'
-      config:
-        provider: dsh-vision
-        displayName: DeepSeek with vision
-        downstreamProvider: deepseek-official
-        downstreamModel: deepseek-v4-flash
-        downstreamModels:
-          - deepseek-v4-flash
-          - deepseek-v4-pro
