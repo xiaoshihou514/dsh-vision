@@ -12,7 +12,7 @@ import { VisionSettingsCard } from './VisionSettingsCard.tsx'
 import type { VisionSettings, VisionSettingsCardInjected } from './VisionSettingsCard.tsx'
 
 /** Required services (fiber inject). */
-export const inject = ['connection', 'settingsScope']
+export const inject = ['connection', 'settingsScope', 'slots']
 
 /**
  * Mount the composer entry: an "upload image" control that translates the

@@ -13,6 +13,7 @@ The hashed files in `lib` came from shared chunks produced by a multi-entry tsdo
 - Build each public Node entry independently. This duplicates a small amount of code, but makes every published filename stable and prevents internal chunks from leaking into the package surface.
 - Clean and validate `lib` in small build scripts. The finalizer fails the build if anything other than the declared public files appears.
 - Keep the client declaration outside `src`; importing the client runtime declaration inside the server TypeScript program changes Cordis context augmentation and conflicts with the host-side session service type.
+- Declare `slots` in the browser plugin's top-level injection list. The settings card reads `ctx.slots` directly, and Cordis rejects undeclared context service access at runtime even when another slot registration is wrapped in a scoped injection.
 
 ## Verification
 
