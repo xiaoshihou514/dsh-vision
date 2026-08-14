@@ -1,6 +1,7 @@
 /** Session-backed visual-description provider. @module dsh-vision/durable-descriptions */
 
 import { Context } from '@deepseek-ai/cordis'
+import { createHash } from 'node:crypto'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionId, SessionStore } from '@deepseek-ai/dsh-session'
 import type { VisionBackend } from './backend.ts'
@@ -27,8 +28,11 @@ export function descriptionCacheKey(
   attachmentId: string,
   model: string,
   promptVersion: string,
+  focus?: string,
 ): string {
-  return `${attachmentId}\u0000${model}\u0000${promptVersion}`
+  const normalizedFocus = focus?.trim().replace(/\s+/g, ' ') ?? ''
+  const focusDigest = createHash('sha256').update(normalizedFocus).digest('hex')
+  return `${attachmentId}\u0000${model}\u0000${promptVersion}\u0000${focusDigest}`
 }
 
 function descriptionFromSession(session: Session, cacheKey: string): VisionDescription | undefined {
@@ -74,6 +78,7 @@ export class DurableVisionDescriptionStore extends VisionDescriptionStore {
       String(request.image.ref.attachmentId),
       this.backend.model,
       this.backend.promptVersion,
+      request.focus,
     )
     const session = this.sessions.get(request.sessionId as SessionId)
     if (session === undefined) throw new Error(`dsh-vision session "${request.sessionId}" is not live`)
@@ -97,7 +102,11 @@ export class DurableVisionDescriptionStore extends VisionDescriptionStore {
     cacheKey: string,
     signal: AbortSignal,
   ): Promise<VisionDescription> {
-    const text = (await this.backend.describe({ image: request.image, signal })).trim()
+    const text = (await this.backend.describe({
+      image: request.image,
+      ...request.focus === undefined ? {} : { focus: request.focus },
+      signal,
+    })).trim()
     if (text.length === 0) throw new Error('dsh-vision backend returned an empty description')
     const live = this.sessions.get(request.sessionId as SessionId)
     if (live === undefined) throw new Error(`dsh-vision session "${request.sessionId}" detached during inference`)

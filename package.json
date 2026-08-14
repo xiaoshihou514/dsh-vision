@@ -14,16 +14,34 @@
       "types": "./lib/durable-descriptions.d.ts",
       "default": "./lib/durable-descriptions.js"
     },
-    "./transformers-backend": {
-      "types": "./lib/transformers-backend.d.ts",
-      "default": "./lib/transformers-backend.js"
+    "./qwen-backend": {
+      "types": "./lib/qwen-backend.d.ts",
+      "default": "./lib/qwen-backend.js"
+    },
+    "./glm-backend": {
+      "types": "./lib/glm-backend.d.ts",
+      "default": "./lib/glm-backend.js"
+    },
+    "./vision-tool": {
+      "types": "./lib/vision-tool.d.ts",
+      "default": "./lib/vision-tool.js"
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./vision-upload": {
+      "types": "./lib/vision-upload.d.ts",
+      "default": "./lib/vision-upload.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    }
   },
   "files": [
     "lib/*.js",
     "lib/*.d.ts",
+    "lib/types/client/**/*.d.ts",
+    "lib/types/client/*.d.ts",
     "cordis.patch.yml",
     "README.md",
     "CHANGELOG.md",
@@ -41,28 +59,48 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
     }
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.1",
-    "@huggingface/transformers": "3.8.1"
+    "@huggingface/transformers": "4.2.0"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/dsh-attachment": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-llm": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-session": "^0.1.0-rc.6"
+    "@deepseek-ai/dsh-session": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.6"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/dsh-attachment": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-llm": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-session": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.6",
     "@types/node": "^22.20.0",
     "tsdown": "^0.22.2",
     "typescript": "^6.0.3",
+    "unrun": "^0.3.1",
     "vitest": "^3.2.4",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.0",
+    "react": "^18.2.0",
+    "@types/react": "^18.2.0",
+    "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.6"
   },
   "license": "MIT",
   "repository": {
@@ -71,7 +109,13 @@
   },
   "homepage": "https://github.com/xiaoshihou514/dsh-vision#readme",
   "bugs": "https://github.com/xiaoshihou514/dsh-vision/issues",
-  "keywords": ["deepseek", "deepseek-harness", "vision", "multimodal", "florence-2"],
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "vision",
+    "multimodal",
+    "qwen3-vl"
+  ],
   "publishConfig": {
     "access": "public"
   }

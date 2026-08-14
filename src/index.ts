@@ -8,6 +8,14 @@ export { VisionAdapter } from './adapter.ts'
 export type { VisionAdapterOptions } from './adapter.ts'
 export { VisionBackend } from './backend.ts'
 export type { VisionBackendRequest } from './backend.ts'
+export {
+  DEFAULT_GLM_BASE_URL,
+  DEFAULT_GLM_FALLBACK_MODELS,
+  DEFAULT_GLM_MODEL,
+  GlmVisionHttpError,
+  glmVisionChat,
+} from './glm-backend.ts'
+export type { GlmVisionRequest } from './glm-backend.ts'
 export { DurableVisionDescriptionStore, descriptionCacheKey } from './durable-descriptions.ts'
 export { isVisionMessageSource, VisionDescriptionStore } from './descriptions.ts'
 export type { VisionDescription, VisionDescriptionRequest, VisionMessageSource } from './descriptions.ts'
@@ -15,9 +23,10 @@ export {
   DEFAULT_MAX_NEW_TOKENS,
   DEFAULT_MODEL_ID,
   DEFAULT_MODEL_REVISION,
-  DEFAULT_TASK,
-  TransformersVisionBackend,
-} from './transformers-backend.ts'
+  QWEN_VISION_SETTINGS_NAMESPACE,
+  QwenVisionBackend,
+} from './qwen-backend.ts'
+export type { QwenDevice, QwenDtype, VisionBackendKind } from './qwen-backend.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'vision-adapter'
@@ -35,6 +44,8 @@ export interface Config {
   downstreamProvider: string
   /** Model on the downstream route. */
   downstreamModel: string
+  /** Downstream text models that should also appear as image-capable wrapper routes. */
+  downstreamModels?: string[]
 }
 
 export const Config: z<Config> = z.object({
@@ -42,6 +53,7 @@ export const Config: z<Config> = z.object({
   displayName: z.string().default('DeepSeek + local vision'),
   downstreamProvider: z.string().required(),
   downstreamModel: z.string().required(),
+  downstreamModels: z.array(z.string()).default([]),
 })
 
 /**
@@ -56,6 +68,7 @@ export function apply(ctx: Context, config: Config): void {
     displayName: config.displayName ?? 'DeepSeek + local vision',
     downstreamProvider: config.downstreamProvider,
     downstreamModel: config.downstreamModel,
+    ...config.downstreamModels === undefined ? {} : { downstreamModels: config.downstreamModels },
     stream: options => ctx.llm.stream(options),
     attachments: ctx.attachments,
     descriptions: ctx.visionDescriptions,

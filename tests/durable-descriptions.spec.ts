@@ -74,6 +74,19 @@ describe('DurableVisionDescriptionStore', () => {
     expect(describe).not.toHaveBeenCalled()
   })
 
+  it('keeps focused evidence distinct for different questions about the same image', async () => {
+    const describe = vi.fn(async ({ focus }: { focus?: string }) => `Evidence for ${focus}`)
+    const { store, session } = fixture(describe)
+
+    const revenue = await store.resolve({ sessionId: session.id, image, focus: 'What is revenue?' })
+    const colors = await store.resolve({ sessionId: session.id, image, focus: 'What colors are used?' })
+    const revenueReplay = await store.resolve({ sessionId: session.id, image, focus: '  What   is revenue?  ' })
+
+    expect(revenue.cacheKey).not.toBe(colors.cacheKey)
+    expect(revenueReplay).toEqual(revenue)
+    expect(describe).toHaveBeenCalledTimes(2)
+  })
+
   it('coalesces concurrent inference for the same session and derivation', async () => {
     let finish: ((text: string) => void) | undefined
     const describe = vi.fn(() => new Promise<string>(resolve => finish = resolve))

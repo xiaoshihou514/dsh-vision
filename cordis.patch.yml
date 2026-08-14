@@ -7,16 +7,27 @@
     model: deepseek-v4-flash
 
 - insert:
-    - id: vision-transformers-backend
-      name: 'dsh-vision/transformers-backend'
+    - id: vision-qwen-backend
+      name: 'dsh-vision/qwen-backend'
+      config:
+        backend: glm
 
     - id: vision-descriptions
       name: 'dsh-vision/durable-descriptions'
+
+    - id: vision-tool
+      name: 'dsh-vision/vision-tool'
+
+    - id: vision-upload
+      name: 'dsh-vision/vision-upload'
 
     - id: vision-adapter
       name: 'dsh-vision'
       config:
         provider: dsh-vision
-        displayName: DeepSeek with local vision
+        displayName: DeepSeek with vision
         downstreamProvider: deepseek-official
         downstreamModel: deepseek-v4-flash
+        downstreamModels:
+          - deepseek-v4-flash
+          - deepseek-v4-pro

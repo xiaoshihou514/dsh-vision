@@ -10,6 +10,8 @@ declare module '@deepseek-ai/cordis' {
 interface VisionBackendRequest {
   /** Verified durable image bytes. */
   image: StoredImageAttachment;
+  /** Nearby user text that determines which visual details matter. */
+  focus?: string;
   /** Cancellation for inference and native-process I/O. */
   signal?: AbortSignal;
 }

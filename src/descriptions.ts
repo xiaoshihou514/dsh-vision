@@ -32,6 +32,8 @@ export interface VisionDescriptionRequest {
   sessionId: NonNullable<GenerateOptions['sessionId']>
   /** Verified image bytes and canonical durable reference. */
   image: StoredImageAttachment
+  /** User-visible text accompanying the image. */
+  focus?: string
 }
 
 /** Visual evidence persisted before it becomes visible to the downstream model. */
@@ -49,8 +51,8 @@ export interface VisionDescription {
 }
 
 /** Return whether a message source is a description persisted by this plugin. */
-export function isVisionMessageSource(source: { kind: string }): source is VisionMessageSource {
-  return source.kind === 'vision'
+export function isVisionMessageSource(source: { kind: string; plugin?: string }): source is VisionMessageSource {
+  return source.kind === 'vision' && source.plugin === 'dsh-vision'
 }
 
 /**

@@ -1,8 +1,8 @@
-import { t as VisionBackend } from "./backend-rYgBi9sO.js";
+import { t as VisionBackend } from "./backend-CDf_s642.js";
 import { GenerateOptions } from "@deepseek-ai/dsh-llm";
 import { Context, Service } from "@deepseek-ai/cordis";
-import { SessionStore } from "@deepseek-ai/dsh-session";
 import { ImageAttachmentRef, StoredImageAttachment } from "@deepseek-ai/dsh-attachment";
+import { SessionStore } from "@deepseek-ai/dsh-session";
 //#region src/descriptions.d.ts
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -29,6 +29,8 @@ interface VisionDescriptionRequest {
   sessionId: NonNullable<GenerateOptions['sessionId']>;
   /** Verified image bytes and canonical durable reference. */
   image: StoredImageAttachment;
+  /** User-visible text accompanying the image. */
+  focus?: string;
 }
 /** Visual evidence persisted before it becomes visible to the downstream model. */
 interface VisionDescription {
@@ -46,6 +48,7 @@ interface VisionDescription {
 /** Return whether a message source is a description persisted by this plugin. */
 declare function isVisionMessageSource(source: {
   kind: string;
+  plugin?: string;
 }): source is VisionMessageSource;
 /**
  * Durable visual-description repository and inference owner.
@@ -64,7 +67,7 @@ declare abstract class VisionDescriptionStore extends Service {
 //#endregion
 //#region src/durable-descriptions.d.ts
 /** Stable cache key for one attachment under one backend derivation identity. */
-declare function descriptionCacheKey(attachmentId: string, model: string, promptVersion: string): string;
+declare function descriptionCacheKey(attachmentId: string, model: string, promptVersion: string, focus?: string): string;
 /** Session-log implementation with per-session inference coalescing. */
 declare class DurableVisionDescriptionStore extends VisionDescriptionStore {
   private readonly sessions;

@@ -1,4 +1,4 @@
-/** Integrity and concurrency controls for the bundled Florence model cache. */
+/** Integrity and concurrency controls for the bundled Qwen model cache. */
 
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
@@ -10,17 +10,14 @@ export interface ModelFile {
   sha256: string
 }
 
-/** Files used by the default q4 Florence-2 inference path. */
+/** Weight files used by the pinned q4 Qwen3-VL inference path. */
 export const DEFAULT_Q4_MODEL_FILES: readonly ModelFile[] = [
-  { path: 'config.json', sha256: 'd90c22ed72eb55291f183fcd9b98ebd3bd3d92bfcffb6c7f6e1606085e793525' },
-  { path: 'generation_config.json', sha256: '7b8eb17bbd6cf8a07f619ad83ae03881eff05b6b9237bab89005b40e77783c29' },
-  { path: 'onnx/decoder_model_merged_q4.onnx', sha256: 'be7a2f33e65f8d65538024772fda4d1c5a7752d60a7159aadf53f9f4798b90fa' },
-  { path: 'onnx/embed_tokens_q4.onnx', sha256: 'f972f338dedea6b67e10e87aacc0dfd4e247f1e18c60d3911af9e6b9edb68f32' },
-  { path: 'onnx/encoder_model_q4.onnx', sha256: '34b17bcf191dacb79bd482b94bad5cf1ba39bc770f6a4c9ae26f28b89c235e4b' },
-  { path: 'onnx/vision_encoder_q4.onnx', sha256: '8f211dfc176996d14e24d551f8e02530de781dd8b30d9e7d35b69b7c2d0340ce' },
-  { path: 'preprocessor_config.json', sha256: 'c892857e34a7082284983a7717717d39c9bf7e574f1f41d80d4c918c97502efa' },
-  { path: 'tokenizer.json', sha256: 'd69dcdb2323e124ac4f800cb9863ddccea0d7bb11e16125e8df3bd60f2f8aeac' },
-  { path: 'tokenizer_config.json', sha256: 'd8e64607233cb53b619fb46664f6cad08176c26e0e8735b2d30d888364f19600' },
+  { path: 'onnx/decoder_model_merged_q4.onnx', sha256: '7fe8b951dd605513efc01553ee98a00c9335b41c22b68790433bd3563521782f' },
+  { path: 'onnx/decoder_model_merged_q4.onnx_data', sha256: '35b8960257384ebe1eb293646f52fdec8d5d25177f37edfb116d63a90f92756c' },
+  { path: 'onnx/embed_tokens_q4.onnx', sha256: '9499fcdba2e1cbbc172913fb2fb950d9b53de54b6a9338997b0956feb035bbad' },
+  { path: 'onnx/embed_tokens_q4.onnx_data', sha256: '6c3b078ca20e4233f27de203812ba74c6b29d5ae4208932857886582ec6aa50d' },
+  { path: 'onnx/vision_encoder_q4.onnx', sha256: '7ccbf866b2e0d0c59272c741715fd78764c8777f1063efe070d420191255c9fe' },
+  { path: 'onnx/vision_encoder_q4.onnx_data', sha256: '4582e91d7221675fb1593ab2f13115aa8403f601be2d9826bb0a84619e62af5a' },
 ]
 
 const LOCK_NAME = '.dsh-vision-download.lock'

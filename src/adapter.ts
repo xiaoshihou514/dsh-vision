@@ -27,6 +27,8 @@ export interface VisionAdapterOptions {
   downstreamProvider: string
   /** Text-only model receiving transformed requests. */
   downstreamModel: string
+  /** Text models exposed through the vision wrapper; each routes to the same downstream model id. */
+  downstreamModels?: readonly string[]
   /** Harness LLM streaming entry point used for delegation. */
   stream: (options: GenerateOptions) => AsyncIterable<StreamChunk>
   /** Durable image byte resolver. */
@@ -61,6 +63,7 @@ async function transformBlocks(
   blocks: readonly ContentBlock[],
   options: GenerateOptions,
   dependencies: Pick<VisionAdapterOptions, 'attachments' | 'descriptions'>,
+  focus: string,
 ): Promise<ContentBlock[]> {
   const transformed: ContentBlock[] = []
   for (const block of blocks) {
@@ -70,14 +73,14 @@ async function transformBlocks(
           throw new LlmError('dsh-vision requires a session id before it can persist visual evidence', 'VISION_SESSION_REQUIRED')
         }
         const image = await dependencies.attachments.readImage(block.attachment, options.signal)
-        const description = await dependencies.descriptions.resolve({ sessionId: options.sessionId, image }, options.signal)
+        const description = await dependencies.descriptions.resolve({ sessionId: options.sessionId, image, focus }, options.signal)
         transformed.push({ type: 'text', text: visualEvidence(description) })
         break
       }
       case 'tool-result':
         transformed.push({
           ...block,
-          content: await transformBlocks(block.content, options, dependencies),
+          content: await transformBlocks(block.content, options, dependencies, focus),
         })
         break
       default:
@@ -88,14 +91,30 @@ async function transformBlocks(
   return transformed
 }
 
+function focusText(blocks: readonly ContentBlock[]): string {
+  const text: string[] = []
+  for (const block of blocks) {
+    if (block.type === 'text') text.push(block.text)
+    if (block.type === 'tool-result') text.push(focusText(block.content))
+  }
+  return text.filter(Boolean).join('\n').trim()
+}
+
 async function transformMessages(
   options: GenerateOptions,
   dependencies: Pick<VisionAdapterOptions, 'attachments' | 'descriptions'>,
 ): Promise<Message[]> {
   const visible = options.messages.filter(message => !isVisionMessageSource(message.source))
+  const currentFocus = visible.findLast(message => message.role === 'user')
+  const currentFocusText = currentFocus === undefined ? '' : focusText(currentFocus.content)
   return Promise.all(visible.map(async message => ({
     ...message,
-    content: await transformBlocks(message.content, options, dependencies),
+    content: await transformBlocks(
+      message.content,
+      options,
+      dependencies,
+      [...new Set([focusText(message.content), currentFocusText].filter(Boolean))].join('\n\n'),
+    ),
   })))
 }
 
@@ -113,38 +132,43 @@ export class VisionAdapter extends LlmAdapter {
   }
 
   override listModels(provider: string): Promise<readonly LlmModelInfo[]> {
-    return Promise.resolve([{
+    return Promise.resolve(this.models().map(model => ({
       provider,
-      id: this.options.downstreamModel,
-      name: `${this.options.downstreamModel} + local vision`,
-      description: `Local visual analysis delegated to ${this.options.downstreamProvider}/${this.options.downstreamModel}`,
+      id: model,
+      name: `${model} + vision`,
+      description: `Visual analysis delegated through dsh-vision before ${this.options.downstreamProvider}/${model}`,
       inputModalities: ['text', 'image'],
-    }])
+    })))
   }
 
   override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
-    if (model !== this.options.downstreamModel) {
+    if (!this.models().includes(model)) {
       return Promise.reject(new LlmError(`dsh-vision does not expose model "${model}"`, 'VISION_MODEL_MISMATCH'))
     }
     return Promise.resolve({
       provider,
       id: model,
-      name: `${model} + local vision`,
+      name: `${model} + vision`,
       inputModalities: ['text', 'image'],
     })
   }
 
   override async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    if (options.model !== this.options.downstreamModel) {
+    if (!this.models().includes(options.model)) {
       throw new LlmError(`dsh-vision does not expose model "${options.model}"`, 'VISION_MODEL_MISMATCH')
     }
     const messages = await transformMessages(options, this.options)
     const downstream: GenerateOptions = {
       ...options,
       provider: this.options.downstreamProvider,
-      model: this.options.downstreamModel,
+      model: options.model,
       messages,
     }
     yield* this.options.stream(downstream)
+  }
+
+  private models(): readonly string[] {
+    const configured = this.options.downstreamModels ?? [this.options.downstreamModel]
+    return [...new Set([this.options.downstreamModel, ...configured])]
   }
 }

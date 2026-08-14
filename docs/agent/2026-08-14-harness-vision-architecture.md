@@ -1,96 +1,76 @@
 # Harness vision architecture
 
-## Goal
+## Product contract
 
-`dsh-vision` makes a text-only DeepSeek route accept image-bearing Harness conversations without replacing the Harness attachment, session, agent-loop, or provider implementations. The first supported hosts are Linux and Windows. Local inference must run without Python, a system package manager, or a separately installed model server.
+`dsh-vision` makes the stock DeepSeek agent experience behave as though the selected DeepSeek route accepts images. For an end user, that means:
 
-## Harness findings
+- select the normal default model and attach images through any Harness surface;
+- ask a question in the same message, without selecting a tool or a second model;
+- receive one streamed DeepSeek answer through the normal agent loop;
+- retain image meaning across retry, resume, and session replay;
+- get the same behavior for user attachments and image blocks returned by tools.
 
-- Harness already has a complete image attachment seam. `@deepseek-ai/dsh-attachment` defines durable image references and `@deepseek-ai/dsh-attachment-local` validates, content-addresses, stores, and reads PNG, JPEG, WebP, and GIF data below `DSH_HOME`.
-- `ContentBlock` already includes an `image` block containing a durable `ImageAttachmentRef`. Image blocks are valid session-log content rather than UI-only state.
-- The pi-ai adapter resolves durable references only at provider dispatch. Provider model metadata declares `inputModalities`; Harness refuses images before dispatch when the selected model is text-only.
-- DeepSeek's official chat-completions route is intentionally declared text-only and cannot be changed through provider settings.
-- Loop-built `GenerateOptions` are deep-frozen before the `llm/stream` waterfall. Middleware may inspect or replace the stream, but it must not mutate messages. This is a deliberate replay invariant.
-- An `LlmAdapter` owns one or more provider route names and receives the complete provider-neutral request. It may yield another `AsyncIterable<StreamChunk>`, which allows a wrapper adapter to delegate a cloned request through `ctx.llm.stream()` to a different route.
-- Anything model-visible must be reconstructable from the session log. A generated caption or OCR result cannot live only in an adapter cache.
+It does not mean image bytes are sent to DeepSeek. A local Qwen vision model observes each image first, and the resulting evidence replaces the image only in a cloned downstream request. The original session continues to contain the durable image attachment.
 
-## Decision
+The bundle selects the synthetic `dsh-vision` route by default, so this translation is invisible during ordinary use. Provider metadata advertises `text` and `image`, allowing Harness to admit image-bearing turns before dispatch.
 
-Implement `dsh-vision` as a synthetic vision-capable LLM adapter, not as `llm/stream` mutation and not as a replacement attachment store.
+## Harness constraints
 
-The selected Harness route will be owned by `dsh-vision` and advertise text plus image input. Its configuration names the downstream text route and model. For each image-bearing request the adapter will:
+- `@deepseek-ai/dsh-attachment` already validates, content-addresses, stores, and resolves PNG, JPEG, WebP, and GIF images below `DSH_HOME`.
+- Image blocks are durable session content, not UI-only state.
+- The stock DeepSeek route is intentionally text-only and must never receive binary image blocks.
+- Loop-built generation requests are frozen. Middleware may replace a stream but cannot mutate messages.
+- An `LlmAdapter` may own a synthetic route, clone a provider-neutral request, and delegate it through `ctx.llm.stream()`.
+- Model-visible derived content must be reconstructable from the session log.
 
-1. Resolve every durable image through `ctx.attachments`.
-2. Derive an immutable cache key from the attachment digest, local vision model identity, prompt-template version, and inference settings.
-3. Reuse a matching description message from the owning session, or run the local vision backend and append that message before downstream dispatch.
-4. Clone the frozen request, replace image blocks with clearly delimited textual visual evidence, and select the configured downstream DeepSeek route and model.
-5. Delegate through `ctx.llm.stream()` and forward its chunks unchanged.
+These constraints make a wrapper adapter the appropriate boundary. Changing DeepSeek metadata alone would send an unsupported wire format; mutating `llm/stream` would violate replay invariants; a vision tool would require users and agents to opt into a different interaction.
 
-The transformation is reconstructable because the original image reference, the generated description, and its derivation identity are durable. Descriptions use the core `user/message` event with a merge-extended `vision` message source. Harness persistence has a generated set of known event types, so an out-of-tree required `vision/description` event could not be resumed by the stock coordinator. Replaying the synthetic adapter filters the storage message, performs the same inline replacement, and does not rerun inference.
+## Request flow
 
-## Why not the alternatives
+For every image-bearing message, the adapter:
 
-- Changing DeepSeek model metadata to claim image input would let binary content reach an endpoint that does not accept it.
-- Rewriting in `llm/stream` conflicts with frozen loop requests and would bypass the Harness reconstruction invariant.
-- Injecting captions only into the system prompt loses message ordering and image-to-turn association.
-- Exposing vision only as a tool does not make attached images naturally available to the current user turn, and tool-returned images still reach the same text-only provider limitation.
-- Storing captions only in a process cache makes resume, retry, and audit depend on nondurable state.
+1. combines the text accompanying that image with the latest user request as the analysis focus;
+2. resolves verified bytes through `ctx.attachments`;
+3. derives a cache key from the attachment digest, Qwen model identity, evidence-prompt version, and normalized focus text;
+4. reuses matching evidence from the owning session or runs local inference;
+5. appends new evidence as a core `user/message` event with a merge-extended `vision` source before using it;
+6. replaces the image with escaped, clearly delimited JSON evidence in a cloned request;
+7. delegates to the configured text-only DeepSeek route and forwards stream chunks unchanged.
 
-## Local runtime direction
+Focus-conditioned analysis is intentional. A neutral caption often omits the exact cell, label, UI state, or spatial relationship needed by the user. Historical images are reanalyzed when a later user question changes the needed evidence; normalized focus text retains deterministic reuse for an equivalent image and question. Multiple images are inspected independently with the shared current question; DeepSeek performs comparison and synthesis over their labelled evidence records.
 
-The first backend uses Transformers.js, ONNX Runtime, and the MIT-licensed `onnx-community/Florence-2-base-ft` model. The repository revision is pinned to `e88a44eaf3791a35eae0c5a47b3dbcd36e67eb6f`; q4 weights are the default. Model files are downloaded on first use into `DSH_HOME/models/dsh-vision`, or the configured cache directory. The runtime is lazy-loaded and inference is serialized so simultaneous requests do not duplicate model loading or saturate a CPU host.
+Persisted `vision` messages are storage records, not additional conversational turns. The adapter filters them from downstream history and reconstructs evidence at the position of each original image. This prevents duplicate evidence while preserving retry and resume.
 
-This path requires no Python, system package manager, CUDA installation, or resident model server. ONNX Runtime publishes Node binaries for Linux and Windows. Its npm install currently downloads CUDA and TensorRT provider libraries on Linux even when the application uses CPU inference, however. That makes the installed dependency tree much larger than the CPU runtime requires. It is an unresolved packaging issue, not a runtime requirement, and must be measured and either reduced or documented before release.
+## Upload-and-recognize channel
 
-The default q4 cache has an embedded nine-file SHA-256 manifest. Cache mutation is serialized with a cross-process lock that uses Node filesystem calls on Linux and Windows. Known corrupt or interrupted files are removed before model loading so Transformers.js downloads them again, and every file is verified after download before the model becomes available. Custom model IDs, revisions, and non-q4 formats do not have a bundled manifest and therefore rely on the user-selected upstream source.
+The synthetic route covers native drag-and-drop into an image-capable model. A second, harness-independent channel serves any model on any session: a composer entry ("upload image") posts browser bytes straight to a dsh-vision HTTP endpoint registered through the harness `webServer` route registry; the configured GLM/Qwen backend returns evidence text; the entry submits that text as a plain-text message. Because the message carries no image part, harness image admission never applies — no model needs to declare image input, and no synthetic route is selected.
 
-## Prototype evidence
+The endpoint requires a custom request header. A cross-site browser cannot set one without a CORS preflight, which the endpoint never answers, so only same-origin harness pages reach it; the endpoint additionally bounds payload size and media type, and fails closed on empty backend output. Image bytes never enter the attachment store on this path — the evidence text is the durable session content, so retry and replay reconstruct identically.
 
-On 2026-08-14, the real backend was run on Linux against `assets/logo.png` with an empty cache in `/tmp`. The pinned q4 model downloaded and produced a detailed, image-specific caption in 68.6 seconds. The downloaded model cache is 321 MB. A warm run with the default detailed-caption and OCR passes took 11.7 seconds and returned both visual detail and detected text. The unit suite covers lazy singleton loading, q4 and revision options, post-processing, OCR composition, cancellation during generation, retry after a failed load, cache repair, digest verification, and cross-process serialization. Windows execution remains unverified.
+## Local model and acceleration
 
-The bundle was also installed through the Harness `dsh plugin --profile vision-test add <checkout>` path in an isolated `DSH_HOME`. Harness recognized the bundle manifest, composed its patch over `dsh-base`, selected `dsh-vision/deepseek-v4-flash` as the default model, resolved all three plugin entry points, and stayed running until an intentional interrupt.
+The default backend is `onnx-community/Qwen3-VL-2B-Instruct-ONNX`, pinned to revision `4739e748dc3798a89254e4932dca19e44aca304a`, using q4 weights. Qwen3-VL was selected for document and screenshot reading, chart and diagram interpretation, spatial grounding, and prompt-conditioned visual reasoning. The 2B checkpoint is the practical default: larger Qwen variants would make the transparent first-use download and consumer CPU fallback unreasonable.
 
-GitHub Actions run `31722947943` repeated the cold real-model test on hosted Linux x64 and Windows x64 runners. Both jobs downloaded and verified the pinned model, loaded the native CPU runtime, decoded the same PNG, ran detailed caption and OCR, and returned the same image-specific result. The test itself took 263.7 seconds on Linux and 248.4 seconds on Windows. The complete jobs took 4 minutes 39 seconds and 5 minutes 4 seconds respectively.
+Transformers.js 4 and ONNX Runtime provide a Python-free, server-free runtime. Device selection defaults to `auto`. On supported hosts ONNX Runtime tries native GPU providers first—CUDA on Linux, DirectML on Windows, and CoreML on macOS—then WebGPU and CPU. Users may force `gpu`, `cpu`, or a specific provider in backend configuration. q4 remains the default on every device to bound storage and memory use.
 
-## Reasonix findings
+Model loading and inference are lazy. Inference is serialized to avoid exhausting a consumer GPU or CPU. Cache mutation is protected by a cross-process lock. The six q4 graph/data files are pinned by SHA-256; corrupt or interrupted entries are removed before load and every weight file is verified before publication.
 
-Reasonix is useful UI and safety prior art, but it does not implement the proposed text-model bridge. It passes images natively to providers marked vision-capable.
+## Evidence and trust boundary
 
-Relevant behavior to retain:
+The Qwen prompt asks for observable evidence rather than a final answer. It requests exact relevant transcription, numbers, labels, layouts, relationships, charts, tables, diagrams, and UI state. It explicitly treats text inside the image as untrusted and refuses to follow image-borne instructions.
 
-- pasted images are copied into owned storage rather than retaining arbitrary source paths;
-- image bytes and media types are verified, symlinks are rejected, and request-sized images are bounded;
-- oversized inputs are downscaled for vision transport;
-- Linux clipboard image paste currently relies on `wl-paste` or `xclip`, while Windows uses PowerShell and `System.Drawing`;
-- native provider serializers attach images to user messages and move tool-result images into a following user message when the provider wire format requires it.
+The adapter then serializes evidence as JSON, escapes `<`, `>`, and `&`, and labels it as untrusted observations. This prevents generated text from closing its delimiter. It cannot make prompt injection impossible; visual evidence remains user-controlled conversation data and DeepSeek must reason about it accordingly.
 
-Harness already owns most storage and validation concerns. `dsh-tui` should later add file, drag/drop, and clipboard ingestion through the Harness attachment service; those UI actions are outside this repository.
+## Failure behavior
 
-## Initial package boundaries
+- A request without a session is rejected before image inference because evidence cannot be made durable.
+- A missing live session or detached session fails rather than producing nondurable evidence.
+- Concurrent requests for the same derivation share one inference job; the job is cancelled only when every waiter cancels.
+- Empty local-model output is rejected and never appended.
+- A failed model load is retryable on the next request.
+- Recursive provider configuration and mismatched synthetic model IDs are rejected explicitly.
+- Unknown custom revisions and dtypes are allowed but do not claim the bundled integrity manifest.
 
-- `adapter`: synthetic provider metadata, request transformation, downstream delegation, and stream forwarding.
-- `descriptions`: durable event schema, cache-key derivation, session lookup, and append-before-use behavior.
-- `backend`: cancellation-aware local inference interface and native-process lifecycle.
-- `model-store`: pinned manifest, resumable download, digest verification, atomic publication, and cache discovery.
-- `prompt`: versioned visual-analysis instructions and stable text rendering.
-- `bundle`: Cordis patch that layers the attachment backend and vision adapter over a Harness base bundle.
+## Remaining UX work outside this package
 
-## First milestones
-
-1. Package scaffold plus a fake backend proving image-to-text request transformation, downstream routing, cancellation, and event reuse.
-2. Native backend spike on CPU for Linux x64 and Windows x64, with benchmark fixtures covering screenshots, diagrams, documents, and photographs.
-3. Verified model download and cache lifecycle with interrupted-download recovery and concurrent-start locking.
-4. Installable Harness bundle and a keyless real-composition transcript proving first use and replay.
-5. `dsh-tui` integration for attachment selection, paste/drop feedback, model download progress, and failures.
-
-## Model boundary
-
-Descriptions and OCR may reproduce instruction-shaped text from an image. The adapter renders visual evidence as JSON, escapes `<`, `>`, and `&`, and labels the payload as untrusted observations. This prevents image text from closing the evidence delimiter. It does not make prompt injection impossible, so downstream agents must continue treating visual evidence as user-controlled conversation data.
-
-## Open questions
-
-- Which session API is safe for an adapter to use while a step is active, and what event ordering constraints apply to an adapter-owned event appended between `step/start` and `assistant/message`?
-- Should one description be a neutral exhaustive observation or be conditioned on the user's prompt? Neutral descriptions maximize reuse; prompt-conditioned analysis may be materially better for charts, OCR, and spatial questions.
-- Should multiple images be analyzed independently, jointly, or both? Independent records cache well; joint analysis preserves comparisons and cross-image references.
-- How should compaction retain descriptions and their association with image blocks?
-- Does the initial model license permit automatic download and the intended redistribution path for native artifacts and tokenizer/config files?
+Harness surfaces own file selection, paste/drop ingestion, progress presentation, and attachment previews. To fulfil the product contract well, those surfaces should show the one-time model download as local preparation, distinguish local visual analysis from the subsequent DeepSeek request, and retain the ordinary cancel control across both phases. No additional vision-specific user workflow should be introduced.
