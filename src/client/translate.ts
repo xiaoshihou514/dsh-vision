@@ -1,6 +1,8 @@
 /** Browser-side translation channel: image bytes in, evidence text out. @module dsh-vision/client/translate */
 
 import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
+import type { IApiClient } from '@deepseek-ai/dsh-client-connection/client'
+import type { SessionId } from '@deepseek-ai/dsh-session'
 
 /** Endpoint registered by the dsh-vision server plugin. */
 export const UPLOAD_ENDPOINT = '/dsh-vision/vision'
@@ -94,15 +96,7 @@ export function supportedImageType(mediaType: string): mediaType is ImageMediaTy
 }
 
 /** Session-prompt client narrowed to the plain-text submission the composer entry performs. */
-export interface EvidenceSubmitter {
-  sessions: {
-    prompt(payload: {
-      sessionId: unknown
-      mode: 'queue'
-      content: readonly { type: 'text'; text: string }[]
-    }): Promise<{ ok: boolean; error?: { message: string } }>
-  }
-}
+export type EvidenceSubmitter = Pick<IApiClient, 'sessions'>
 
 /**
  * Submit translated evidence as a plain-text message. Text-only content never
@@ -114,7 +108,7 @@ export interface EvidenceSubmitter {
  */
 export async function submitEvidence(
   api: EvidenceSubmitter,
-  sessionId: unknown,
+  sessionId: SessionId,
   text: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
@@ -123,7 +117,7 @@ export async function submitEvidence(
       mode: 'queue',
       content: [{ type: 'text', text }],
     })
-    if (!response.ok) return { ok: false, error: response.error?.message ?? '消息发送失败' }
+    if (!response.result.ok) return { ok: false, error: response.result.error.message }
     return { ok: true }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }

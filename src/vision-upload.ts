@@ -101,9 +101,12 @@ function writeJson(res: ServerResponse, status: number, value: unknown): void {
  * @param config - validated route configuration.
  */
 export function apply(ctx: Context, config: Config): void {
+  const path = config.path ?? '/dsh-vision/vision'
+  const header = config.header ?? 'x-dsh-vision'
+  const maxImageBytes = config.maxImageBytes ?? DEFAULT_MAX_IMAGE_BYTES
   const route: WebRouteShape = {
     kind: 'exact',
-    path: config.path,
+    path,
     handler: async (req, res) => {
       try {
         if (req.method !== 'POST') {
@@ -113,16 +116,17 @@ export function apply(ctx: Context, config: Config): void {
         // A custom header forces a CORS preflight on cross-site browsers; this
         // handler never answers preflight, so only same-origin harness pages
         // (which may set the header freely) reach the endpoint.
-        if (req.headers[config.header] !== HEADER_VALUE) {
+        if (req.headers[header] !== HEADER_VALUE) {
           writeJson(res, 403, { ok: false, error: 'forbidden' })
           return
         }
-        const payload = await readJsonBody(req, config.maxImageBytes * 2 + 64 * 1024) as Partial<UploadPayload>
+        const payload = await readJsonBody(req, maxImageBytes * 2 + 64 * 1024) as Partial<UploadPayload>
         if (typeof payload.data !== 'string' || payload.data.length === 0) {
           writeJson(res, 400, { ok: false, error: 'missing image data' })
           return
         }
-        if (!MEDIA_TYPES.includes(payload.mediaType as ImageMediaType)) {
+        const mediaType = payload.mediaType
+        if (typeof mediaType !== 'string' || !MEDIA_TYPES.includes(mediaType as ImageMediaType)) {
           writeJson(res, 400, { ok: false, error: 'unsupported media type' })
           return
         }
@@ -133,14 +137,14 @@ export function apply(ctx: Context, config: Config): void {
           writeJson(res, 400, { ok: false, error: 'invalid base64' })
           return
         }
-        if (bytes.byteLength === 0 || bytes.byteLength > config.maxImageBytes) {
+        if (bytes.byteLength === 0 || bytes.byteLength > maxImageBytes) {
           writeJson(res, 400, { ok: false, error: 'image size out of range' })
           return
         }
         const image: StoredImageAttachment = {
           ref: {
             attachmentId: AttachmentId(`sha256:${createHash('sha256').update(bytes).digest('hex')}`),
-            mediaType: payload.mediaType,
+            mediaType: mediaType as ImageMediaType,
             bytes: bytes.byteLength,
             // The durable attachment service stays authoritative for display
             // geometry; backend consumption uses verified bytes and media type.

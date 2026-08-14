@@ -1,6 +1,36 @@
-import { n as VisionBackendRequest, t as VisionBackend } from "./backend-CDf_s642.js";
 import z from "@deepseek-ai/schemastery";
-import { Context } from "@deepseek-ai/cordis";
+import { Context, Service } from "@deepseek-ai/cordis";
+import { StoredImageAttachment } from "@deepseek-ai/dsh-attachment";
+//#region src/backend.d.ts
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    visionBackend: VisionBackend;
+  }
+}
+/** Input for one local image-analysis call. */
+interface VisionBackendRequest {
+  /** Verified durable image bytes. */
+  image: StoredImageAttachment;
+  /** Nearby user text that determines which visual details matter. */
+  focus?: string;
+  /** Cancellation for inference and native-process I/O. */
+  signal?: AbortSignal;
+}
+/** Local visual inference provider. */
+declare abstract class VisionBackend extends Service {
+  constructor(ctx: Context);
+  /** Versioned model identity, including quantization. */
+  abstract readonly model: string;
+  /** Version of the visual-analysis prompt. */
+  abstract readonly promptVersion: string;
+  /**
+   * Describe one verified image.
+   * @param request - image bytes and cancellation.
+   * @returns non-empty plain-text visual evidence.
+   */
+  abstract describe(request: VisionBackendRequest): Promise<string>;
+}
+//#endregion
 //#region src/qwen-backend.d.ts
 declare const DEFAULT_MODEL_ID = "onnx-community/Qwen3-VL-2B-Instruct-ONNX";
 declare const DEFAULT_MODEL_REVISION = "4739e748dc3798a89254e4932dca19e44aca304a";

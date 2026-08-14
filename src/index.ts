@@ -3,6 +3,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { VisionAdapter } from './adapter.ts'
+import { QWEN_VISION_SETTINGS_NAMESPACE } from './qwen-backend.ts'
 
 export { VisionAdapter } from './adapter.ts'
 export type { VisionAdapterOptions } from './adapter.ts'
@@ -73,5 +74,11 @@ export function apply(ctx: Context, config: Config): void {
     attachments: ctx.attachments,
     descriptions: ctx.visionDescriptions,
   })
+  ctx.llm.registerConfigurableProviders([{
+    provider,
+    displayName: config.displayName ?? 'DeepSeek + local vision',
+    settingsNs: QWEN_VISION_SETTINGS_NAMESPACE,
+    settingsPath: [],
+  }])
   ctx.llm.registerAdapter([provider], adapter)
 }

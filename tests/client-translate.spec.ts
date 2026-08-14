@@ -7,6 +7,7 @@ import {
   UPLOAD_HEADER_VALUE,
 } from '../src/client/translate.ts'
 import type { EvidenceSubmitter } from '../src/client/translate.ts'
+import { SessionId } from '@deepseek-ai/dsh-session'
 
 describe('translateImage', () => {
   it('posts bytes to the endpoint and returns evidence text', async () => {
@@ -53,18 +54,18 @@ describe('submitEvidence', () => {
         mode: 'queue',
         content: [{ type: 'text', text: 'Evidence text.' }],
       })
-      return { ok: true }
+      return { rpcId: 'test', result: { ok: true, value: { accepted: true } } }
     })
     const api = { sessions: { prompt } } as unknown as EvidenceSubmitter
-    await expect(submitEvidence(api, 'session-id', 'Evidence text.')).resolves.toEqual({ ok: true })
+    await expect(submitEvidence(api, SessionId('session-id'), 'Evidence text.')).resolves.toEqual({ ok: true })
   })
 
   it('reports submission failures', async () => {
     const api = {
       sessions: {
-        prompt: vi.fn(async () => ({ ok: false, error: { message: 'agent busy' } })),
+        prompt: vi.fn(async () => ({ rpcId: 'test', result: { ok: false, error: { code: 'busy', message: 'agent busy' } } })),
       },
     } as unknown as EvidenceSubmitter
-    await expect(submitEvidence(api, 'session-id', 'text')).resolves.toEqual({ ok: false, error: 'agent busy' })
+    await expect(submitEvidence(api, SessionId('session-id'), 'text')).resolves.toEqual({ ok: false, error: 'agent busy' })
   })
 })

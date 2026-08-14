@@ -2,18 +2,20 @@ import { defineConfig } from 'tsdown'
 
 /** Platform module table entries the client bundle resolves through the loader require. */
 const CLIENT_EXTERNALS = ['react', 'react/jsx-runtime']
+const NODE_ENTRIES = ['index', 'durable-descriptions', 'qwen-backend', 'glm-backend', 'vision-tool', 'vision-upload'] as const
 
 export default defineConfig([
-  {
-    name: 'dsh-vision/lib',
-    entry: ['src/index.ts', 'src/durable-descriptions.ts', 'src/qwen-backend.ts', 'src/glm-backend.ts', 'src/vision-tool.ts', 'src/vision-upload.ts'],
-    clean: true,
+  ...NODE_ENTRIES.map(entry => ({
+    name: `dsh-vision/${entry}`,
+    entry: { [entry]: `src/${entry}.ts` },
+    clean: false,
     dts: true,
     fixedExtension: false,
     format: 'esm',
     outDir: 'lib',
     platform: 'node',
-  },
+    splitting: false,
+  })),
   {
     name: 'dsh-vision/client',
     entry: { client: 'src/client/index.ts' },
@@ -24,6 +26,7 @@ export default defineConfig([
     platform: 'browser',
     dts: false,
     clean: false,
+    splitting: false,
     external: CLIENT_EXTERNALS,
     define: {
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'production'),
