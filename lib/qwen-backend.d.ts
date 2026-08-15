@@ -65,6 +65,7 @@ declare class QwenVisionBackend extends VisionBackend {
   private loaded;
   private inferenceTail;
   private readonly logger;
+  private readonly pluginContext;
   private source;
   /** Current derivation identity; settings changes create distinct durable evidence. */
   get model(): string;

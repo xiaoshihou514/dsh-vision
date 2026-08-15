@@ -3,6 +3,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Context, Logger } from "@deepseek-ai/cordis";
+import { credentialRef } from "@deepseek-ai/dsh-credentials";
 import {
   installSettingsSection,
   settingsNamespace,
@@ -153,6 +154,7 @@ export class QwenVisionBackend extends VisionBackend {
   private loaded: { key: string; promise: Promise<LoadedQwen> } | undefined;
   private inferenceTail: Promise<void> = Promise.resolve();
   private readonly logger: Logger;
+  private readonly pluginContext: Context;
   private source: () => Config;
 
   /** Current derivation identity; settings changes create distinct durable evidence. */
@@ -172,6 +174,7 @@ export class QwenVisionBackend extends VisionBackend {
     private readonly cacheDir = DEFAULT_CACHE_DIR,
   ) {
     super(ctx);
+    this.pluginContext = ctx;
     this.logger = ctx.logger("dsh-vision");
     const entry = resolveConfig(config);
     entry.cacheDir = cacheDir;
@@ -269,10 +272,13 @@ export class QwenVisionBackend extends VisionBackend {
       /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])(?::|\/|$)/.test(
         config.baseURL,
       );
+    const managed = await this.pluginContext
+      .get("credentials")
+      ?.resolve(credentialRef(config.apiKeyEnv));
     const apiKey =
+      managed?.value.trim() ||
       process.env[config.apiKeyEnv]?.trim() ||
       process.env.VISION_API_KEY?.trim() ||
-      process.env.ZHIPUAI_API_KEY?.trim() ||
       "";
     if (apiKey === "" && !local) {
       throw new Error(

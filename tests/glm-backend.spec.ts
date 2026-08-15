@@ -1,5 +1,6 @@
 import { Context } from '@deepseek-ai/cordis'
 import type { StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
+import { CredentialProvider, credentialRef } from '@deepseek-ai/dsh-credentials'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { glmVisionChat } from '../src/glm-backend.ts'
 import { QwenVisionBackend } from '../src/qwen-backend.ts'
@@ -8,6 +9,28 @@ const image = {
   ref: { attachmentId: 'sha256:test', mediaType: 'image/png', bytes: 3, width: 1, height: 1 },
   data: new Uint8Array([1, 2, 3]),
 } as StoredImageAttachment
+
+class MemoryCredentials extends CredentialProvider {
+  value = 'stored-key'
+
+  resolve(): Promise<{ value: string; source: string }> {
+    return Promise.resolve({ value: this.value, source: 'memory' })
+  }
+
+  describe(): Promise<{ configured: boolean; source: string; writable: boolean }> {
+    return Promise.resolve({ configured: true, source: 'memory', writable: true })
+  }
+
+  set(_ref: ReturnType<typeof credentialRef>, value: string): Promise<void> {
+    this.value = value
+    return Promise.resolve()
+  }
+
+  unset(): Promise<void> {
+    this.value = ''
+    return Promise.resolve()
+  }
+}
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -35,6 +58,24 @@ describe('glmVisionChat', () => {
 })
 
 describe('GLM-backed vision service', () => {
+  it('resolves the key saved by the Harness credential service', async () => {
+    const ctx = new Context()
+    await ctx.plugin(MemoryCredentials).await()
+    const requests: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      requests.push(String((init?.headers as Record<string, string>).authorization))
+      return new Response(JSON.stringify({ choices: [{ message: { content: 'Stored-key evidence' } }] }))
+    }))
+    const backend = new QwenVisionBackend(ctx, { backend: 'glm' })
+
+    await expect(backend.describe({ image })).resolves.toBe('Stored-key evidence')
+    await ctx.credentials.set(credentialRef('ZHIPUAI_API_KEY'), 'rotated-key')
+    await expect(backend.describe({ image })).resolves.toBe('Stored-key evidence')
+
+    expect(requests).toEqual(['Bearer stored-key', 'Bearer rotated-key'])
+    await ctx.fiber.dispose()
+  })
+
   it('uses the free fallback chain on rate limiting', async () => {
     vi.stubEnv('ZHIPUAI_API_KEY', 'test-key')
     const models: string[] = []
