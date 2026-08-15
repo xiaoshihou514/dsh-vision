@@ -1,6 +1,11 @@
 /** Settings -> Plugins card for the host-side dsh-vision settings section. */
 
-import { useSyncExternalStore, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useSyncExternalStore,
+  useState,
+  type CSSProperties,
+} from "react";
 import type { IApiClient } from "@deepseek-ai/dsh-client-connection/client";
 import type { VisionSettingsScope } from "./vision-settings.ts";
 
@@ -26,7 +31,8 @@ const header: CSSProperties = {
   width: "100%",
   appearance: "none",
   border: 0,
-  background: "none",
+  background: "transparent",
+  borderRadius: 12,
   color: "inherit",
   font: "inherit",
   textAlign: "left",
@@ -56,6 +62,18 @@ const primary: CSSProperties = {
   cursor: "pointer",
   color: "var(--dsw-alias-bg-layer-3)",
   background: "var(--dsw-alias-label-primary)",
+};
+const secondary: CSSProperties = {
+  appearance: "none",
+  border: "1px solid var(--dsw-alias-border-l2)",
+  borderRadius: 8,
+  padding: "5px 14px",
+  font: "inherit",
+  fontSize: 13,
+  lineHeight: 1.5,
+  cursor: "pointer",
+  color: "var(--dsw-alias-label-primary)",
+  background: "transparent",
 };
 
 function text(value: unknown): string {
@@ -97,8 +115,27 @@ export function VisionSettingsCard({ scope, api }: VisionSettingsCardInjected) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>({});
   const [apiKey, setApiKey] = useState("");
+  const [keyConfigured, setKeyConfigured] = useState<boolean | undefined>();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let stale = false;
+    void api.credentials.describe({ refs: ["ZHIPUAI_API_KEY"] }).then(
+      (response) => {
+        if (stale || !response.result.ok) return;
+        setKeyConfigured(
+          response.result.value.credentials.ZHIPUAI_API_KEY?.configured ??
+            false,
+        );
+      },
+      () => undefined,
+    );
+    return () => {
+      stale = true;
+    };
+  }, [api.credentials]);
+
   if (snapshot.status === "unavailable") return null;
 
   const value = snapshot.value ?? {};
@@ -127,6 +164,7 @@ export function VisionSettingsCard({ scope, api }: VisionSettingsCardInjected) {
           value: apiKey.trim(),
         });
         if (!response.result.ok) throw new Error(response.result.error.message);
+        setKeyConfigured(true);
       }
       setDraft({});
       setApiKey("");
@@ -143,11 +181,12 @@ export function VisionSettingsCard({ scope, api }: VisionSettingsCardInjected) {
         type="button"
         style={header}
         aria-expanded={open}
+        aria-label={`${open ? "收起" : "展开"}：视觉识别`}
         onClick={() => {
           setOpen(!open);
         }}
       >
-        <span style={{ display: "grid", gap: 4, flex: 1 }}>
+        <span style={{ display: "grid", gap: 4, flex: 1, minWidth: 0 }}>
           <strong style={{ fontSize: 15 }}>视觉识别</strong>
           <span
             style={{ color: "var(--dsw-alias-label-tertiary)", fontSize: 13 }}
@@ -155,12 +194,24 @@ export function VisionSettingsCard({ scope, api }: VisionSettingsCardInjected) {
             配置 GLM 云端识图或本地 Qwen3-VL
           </span>
         </span>
-        <span
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 14 14"
+          fill="none"
           aria-hidden="true"
-          style={{ transform: open ? "rotate(180deg)" : undefined }}
+          style={{
+            color: "var(--dsw-alias-label-tertiary)",
+            flex: "none",
+            transform: open ? "rotate(180deg)" : undefined,
+            transition: "transform .16s",
+          }}
         >
-          ⌄
-        </span>
+          <path
+            d="M11.8486 5.5L11.4238 5.92383L8.69727 8.65137C8.44157 8.90706 8.21562 9.13382 8.01172 9.29785C7.79912 9.46883 7.55595 9.61756 7.25 9.66602C7.08435 9.69222 6.91565 9.69222 6.75 9.66602C6.44405 9.61756 6.20088 9.46883 5.98828 9.29785C5.78438 9.13382 5.55843 8.90706 5.30273 8.65137L2.57617 5.92383L2.15137 5.5L3 4.65137L3.42383 5.07617L6.15137 7.80273C6.42595 8.07732 6.59876 8.24849 6.74023 8.3623C6.87291 8.46904 6.92272 8.47813 6.9375 8.48047C6.97895 8.48703 7.02105 8.48703 7.0625 8.48047C7.07728 8.47813 7.12709 8.46904 7.25977 8.3623C7.40124 8.24849 7.57405 8.07732 7.84863 7.80273L10.5762 5.07617L11 4.65137L11.8486 5.5Z"
+            fill="currentColor"
+          />
+        </svg>
       </button>
       {open ? (
         <div
@@ -186,13 +237,31 @@ export function VisionSettingsCard({ scope, api }: VisionSettingsCardInjected) {
           </label>
           {backend === "glm" ? (
             <>
-              <Field
-                label="API Key（仅写入凭据存储）"
-                type="password"
-                value={apiKey}
-                disabled={disabled}
-                onChange={setApiKey}
-              />
+              <div style={{ position: "relative" }}>
+                <Field
+                  label="API Key（仅写入凭据存储）"
+                  type="password"
+                  value={apiKey}
+                  disabled={disabled}
+                  onChange={setApiKey}
+                />
+                {keyConfigured !== undefined ? (
+                  <span
+                    role="status"
+                    style={{
+                      position: "absolute",
+                      right: 0,
+                      top: 12,
+                      color: keyConfigured
+                        ? "var(--dsw-alias-label-primary)"
+                        : "var(--dsw-alias-label-tertiary)",
+                      fontSize: 12,
+                    }}
+                  >
+                    {keyConfigured ? "已配置" : "未配置"}
+                  </span>
+                ) : null}
+              </div>
               <p
                 style={{
                   margin: "8px 0 0",
@@ -256,6 +325,7 @@ export function VisionSettingsCard({ scope, api }: VisionSettingsCardInjected) {
           >
             <button
               type="button"
+              style={secondary}
               disabled={
                 saving || (Object.keys(draft).length === 0 && apiKey === "")
               }
