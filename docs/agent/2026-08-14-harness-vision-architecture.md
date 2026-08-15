@@ -34,7 +34,7 @@ Harness does not currently let an external plugin add its namespace to the API p
 
 GLM is the default backend. Local Qwen is the offline option. The local runtime uses Transformers.js 4 and ONNX Runtime, so users do not need Python or a model server.
 
-The default local model is `onnx-community/Qwen3-VL-2B-Instruct-ONNX`, revision `4739e748dc3798a89254e4932dca19e44aca304a`, with q4 weights. Device selection defaults to `auto`. The runtime tries supported acceleration providers and falls back to CPU. Users can select a device explicitly.
+The default local model is `onnx-community/Qwen3-VL-2B-Instruct-ONNX`, revision `4739e748dc3798a89254e4932dca19e44aca304a`, with q4 weights. The runtime uses bundled DirectML on Windows and bundled native WebGPU on Linux, then falls back to CPU only if accelerated initialization rejects.
 
 Model loading is lazy, and inference is serialized. A process lock protects cache updates. The six default q4 files have pinned SHA-256 digests; corrupt files are discarded and downloaded again.
 

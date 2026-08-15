@@ -71,7 +71,7 @@ interface ResolvedConfig {
   modelId: string;
   revision: string;
   dtype: "q4";
-  device: "auto";
+  device: "webgpu" | "dml";
   cacheDir: string;
   maxNewTokens: number;
 }
@@ -94,10 +94,12 @@ function resolveConfig(config: Config): ResolvedConfig {
     glmTimeoutMs: 60000,
     modelId: preset.modelId,
     revision: DEFAULT_MODEL_REVISION,
-    // Transformers.js resolves literal "auto" + auto device to FP32. Q4 is the
-    // portable automatic policy for these presets and keeps first-run memory sane.
+    // Q4 is the portable automatic policy for these presets and keeps first-run
+    // downloads and memory usage sane on both accelerated providers.
     dtype: "q4",
-    device: "auto",
+    // Both providers ship with onnxruntime-node and need no CUDA toolkit:
+    // DirectML is native on Windows, while WebGPU is native on Linux.
+    device: process.platform === "win32" ? "dml" : "webgpu",
     cacheDir: DEFAULT_CACHE_DIR,
     maxNewTokens: DEFAULT_MAX_NEW_TOKENS,
   };
@@ -382,7 +384,6 @@ export class QwenVisionBackend extends VisionBackend {
           options,
         );
       } catch (error) {
-        if (config.device !== "auto") throw error;
         this.logger.warn(
           "automatic accelerated model initialization failed; retrying on CPU: %s",
           error instanceof Error ? error.message : String(error),

@@ -12,6 +12,8 @@ The browser plugin no longer owns image intake. The Harness composer already pro
 
 The settings card still needs a small same-origin host bridge because the client API has no generic settings mutation remote. This is shipped as the independent `settings-api` entry. It must not be coupled to an image upload route again: removing custom image intake must not remove plugin configuration.
 
+Local Qwen must not use Transformers.js `device: auto` on Linux. That list probes CUDA first; the npm archive omits the 302 MB CUDA provider, and even the provider's install hook still requires a separately installed CUDA 12 and cuDNN 9 runtime. The failure is logged by ONNX Runtime but does not reject session creation, so the backend silently continues on CPU and our JavaScript fallback never sees it. Use ONNX Runtime's bundled native WebGPU provider on Linux and bundled DirectML provider on Windows. Both work from the normal package install without an external compute environment; CPU remains the explicit recovery path if accelerated session creation rejects.
+
 API Proxy performs exact-model modality admission before it stores browser attachments or wakes the Agent. DeepSeek models explicitly advertise `text` only, so `agent/pre-step` alone cannot receive a native upload. While dsh-vision is active, the preprocessor decorates exact-model metadata with the `image` input modality supplied by this plugin. It does not register an adapter, provider, model alias, or replacement route; provider and model identity remain unchanged. The decorator is removed with the plugin lifecycle.
 
 On the host, `vision-preprocessor` listens at `agent/pre-step` after downstream handlers. For every image-bearing user message it:

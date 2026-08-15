@@ -88,6 +88,8 @@ function backend(fixture: RuntimeFixture): QwenVisionBackend {
 }
 
 describe('QwenVisionBackend', () => {
+  const acceleratedDevice = process.platform === 'win32' ? 'dml' : 'webgpu'
+
   it('loads the newest q4 preset once, auto-selects acceleration, and returns only generated text', async () => {
     const fixture = runtimeFixture()
     const subject = backend(fixture)
@@ -102,7 +104,7 @@ describe('QwenVisionBackend', () => {
       cache_dir: '/tmp/dsh-vision-test-cache',
       revision: DEFAULT_MODEL_REVISION,
       dtype: 'q4',
-      device: 'auto',
+      device: acceleratedDevice,
       use_external_data_format: {
         'decoder_model_merged_q4.onnx': 1,
         'embed_tokens_q4.onnx': 1,
@@ -168,7 +170,7 @@ describe('QwenVisionBackend', () => {
     await subject.describe({ image })
 
     expect(fixture.fromModel).toHaveBeenCalledWith('onnx-community/Qwen2-VL-2B-Instruct', expect.objectContaining({
-      device: 'auto',
+      device: acceleratedDevice,
       dtype: 'q4',
     }))
     expect(fixture.generate).toHaveBeenCalledWith(expect.objectContaining({ max_new_tokens: 384 }))

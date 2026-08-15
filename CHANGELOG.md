@@ -7,6 +7,7 @@
 - Add a workspace-scoped `view_image` tool for text-only models.
 - Remove the synthetic vision provider and model copies. The plugin no longer changes the default model.
 - Keep plugin configuration available independently of the native image intake path.
+- Run local Qwen on the bundled WebGPU provider on Linux and DirectML on Windows instead of silently falling back from an unavailable CUDA environment to CPU.
 
 ## 0.1.0 - 2026-08-14
 
