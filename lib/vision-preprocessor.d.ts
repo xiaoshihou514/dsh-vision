@@ -1,5 +1,5 @@
-import { UserMessage } from "@deepseek-ai/dsh-llm";
 import { Context, Service } from "@deepseek-ai/cordis";
+import { LlmResolvedModelInfo, LlmRuntime, UserMessage } from "@deepseek-ai/dsh-llm";
 import { AttachmentStore, StoredImageAttachment } from "@deepseek-ai/dsh-attachment";
 //#region src/backend.d.ts
 declare module "@deepseek-ai/cordis" {
@@ -34,6 +34,17 @@ declare abstract class VisionBackend extends Service {
 //#region src/vision-preprocessor.d.ts
 declare const name = "vision-preprocessor";
 declare const inject: string[];
+type ResolveModelInfo = LlmRuntime["resolveModelInfo"];
+interface ModelInfoRuntime {
+  resolveModelInfo: ResolveModelInfo;
+}
+/** Advertise the image capability supplied by this plugin on an existing route. */
+declare function withVisionInput(info: LlmResolvedModelInfo): LlmResolvedModelInfo;
+/**
+ * Decorate exact-model capability lookup without registering model aliases.
+ * API Proxy uses this lookup for image admission before Agent preprocessing.
+ */
+declare function installVisionCapability(runtime: ModelInfoRuntime): () => void;
 /**
  * Keep user-authored text visible and move generated evidence into a collapsed
  * context message. No returned message contains an image block.
@@ -42,4 +53,4 @@ declare function transcribeImages(attachments: AttachmentStore, backend: VisionB
 /** Install the adapter-neutral image-to-text boundary for every Agent input. */
 declare function apply(ctx: Context): void;
 //#endregion
-export { apply, inject, name, transcribeImages };
+export { apply, inject, installVisionCapability, name, transcribeImages, withVisionInput };

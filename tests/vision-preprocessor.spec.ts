@@ -6,7 +6,11 @@ import {
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { describe, expect, it, vi } from 'vitest'
 import type { VisionBackend } from '../src/backend.ts'
-import { transcribeImages } from '../src/vision-preprocessor.ts'
+import {
+  installVisionCapability,
+  transcribeImages,
+  withVisionInput,
+} from '../src/vision-preprocessor.ts'
 
 const ref = {
   attachmentId: AttachmentId('image-1'),
@@ -18,6 +22,43 @@ const ref = {
 }
 
 describe('image message preprocessing', () => {
+  it('advertises plugin-provided image input without changing model identity', async () => {
+    const original = vi.fn(async (_provider: string, _model: string) => ({
+      provider: 'deepseek-official',
+      id: 'deepseek-v4-flash',
+      name: 'DeepSeek-V4-Flash',
+      inputModalities: ['text'] as const,
+    }))
+    const runtime = { resolveModelInfo: original }
+    const restore = installVisionCapability(runtime)
+
+    await expect(
+      runtime.resolveModelInfo('deepseek-official', 'deepseek-v4-flash'),
+    ).resolves.toEqual({
+      provider: 'deepseek-official',
+      id: 'deepseek-v4-flash',
+      name: 'DeepSeek-V4-Flash',
+      inputModalities: ['text', 'image'],
+    })
+    expect(original).toHaveBeenCalledWith(
+      'deepseek-official',
+      'deepseek-v4-flash',
+    )
+
+    restore()
+    expect(runtime.resolveModelInfo).toBe(original)
+  })
+
+  it('does not duplicate an adapter-native image capability', () => {
+    const info = {
+      provider: 'native',
+      id: 'vision',
+      name: 'Vision',
+      inputModalities: ['text', 'image'] as const,
+    }
+    expect(withVisionInput(info)).toBe(info)
+  })
+
   it('keeps user text visible and moves evidence to collapsed plugin context', async () => {
     const image: StoredImageAttachment = {
       ref,

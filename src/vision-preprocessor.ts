@@ -1,17 +1,55 @@
 /** Convert provider-neutral image blocks to vision evidence before an Agent step. */
 
-import type { Context } from "@deepseek-ai/cordis";
+import { symbols, type Context } from "@deepseek-ai/cordis";
 import type {} from "@deepseek-ai/dsh-agent";
 import type { AttachmentStore } from "@deepseek-ai/dsh-attachment";
 import {
   createUserMessage,
   type ContentBlock,
+  type LlmResolvedModelInfo,
+  type LlmRuntime,
   type UserMessage,
 } from "@deepseek-ai/dsh-llm";
 import type { VisionBackend } from "./backend.ts";
 
 export const name = "vision-preprocessor";
-export const inject = ["attachments", "visionBackend"];
+export const inject = ["attachments", "llm", "visionBackend"];
+
+type ResolveModelInfo = LlmRuntime["resolveModelInfo"];
+interface ModelInfoRuntime {
+  resolveModelInfo: ResolveModelInfo;
+}
+
+/** Advertise the image capability supplied by this plugin on an existing route. */
+export function withVisionInput(
+  info: LlmResolvedModelInfo,
+): LlmResolvedModelInfo {
+  if (info.inputModalities?.includes("image") === true) return info;
+  return {
+    ...info,
+    inputModalities: [...(info.inputModalities ?? ["text"]), "image"],
+  };
+}
+
+/**
+ * Decorate exact-model capability lookup without registering model aliases.
+ * API Proxy uses this lookup for image admission before Agent preprocessing.
+ */
+export function installVisionCapability(runtime: ModelInfoRuntime): () => void {
+  const previous = runtime.resolveModelInfo;
+  const decorated: ResolveModelInfo = async function (
+    this: LlmRuntime,
+    ...args: Parameters<ResolveModelInfo>
+  ) {
+    return withVisionInput(await previous.apply(this, args));
+  };
+  runtime.resolveModelInfo = decorated;
+  return () => {
+    if (runtime.resolveModelInfo === decorated) {
+      runtime.resolveModelInfo = previous;
+    }
+  };
+}
 
 function focusOf(message: UserMessage): string | undefined {
   const text = message.content
@@ -92,6 +130,11 @@ export async function transcribeImages(
 
 /** Install the adapter-neutral image-to-text boundary for every Agent input. */
 export function apply(ctx: Context): void {
+  const traced = ctx.llm as LlmRuntime & {
+    [symbols.original]?: LlmRuntime;
+  };
+  const runtime = traced[symbols.original] ?? traced;
+  ctx.effect(() => installVisionCapability(runtime));
   ctx.on("agent/pre-step", async (payload, next) => {
     const decision = await next();
     if (decision.kind === "reject") return decision;
