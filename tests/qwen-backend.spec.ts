@@ -84,17 +84,11 @@ function runtimeFixture(): RuntimeFixture {
 function backend(fixture: RuntimeFixture): QwenVisionBackend {
   return new QwenVisionBackend(new Context(), {
     backend: 'qwen',
-    modelId: DEFAULT_MODEL_ID,
-    revision: DEFAULT_MODEL_REVISION,
-    dtype: 'q4',
-    device: 'auto',
-    cacheDir: '/tmp/dsh-vision-test-cache',
-    maxNewTokens: 384,
-  }, async () => fixture.runtime as never, false)
+  }, async () => fixture.runtime as never, false, '/tmp/dsh-vision-test-cache')
 }
 
 describe('QwenVisionBackend', () => {
-  it('loads the pinned q4 model once, auto-selects acceleration, and returns only generated text', async () => {
+  it('loads the newest q4 preset once, auto-selects acceleration, and returns only generated text', async () => {
     const fixture = runtimeFixture()
     const subject = backend(fixture)
 
@@ -157,53 +151,28 @@ describe('QwenVisionBackend', () => {
     expect(fixture.fromModel.mock.calls[1]?.[1]).toMatchObject({ device: 'cpu' })
   })
 
-  it('does not hide an explicitly requested GPU failure', async () => {
-    const fixture = runtimeFixture()
-    fixture.fromModel.mockRejectedValue(new Error('GPU provider unavailable'))
-    const subject = new QwenVisionBackend(new Context(), {
-      backend: 'qwen',
-      modelId: DEFAULT_MODEL_ID,
-      revision: DEFAULT_MODEL_REVISION,
-      dtype: 'q4',
-      device: 'cuda',
-      cacheDir: '/tmp/dsh-vision-test-cache',
-      maxNewTokens: 384,
-    }, async () => fixture.runtime as never, false)
-
-    await expect(subject.describe({ image })).rejects.toThrow('GPU provider unavailable')
-    expect(fixture.fromModel).toHaveBeenCalledTimes(1)
-  })
-
   it('applies native plugin settings to the next inference and its evidence identity', async () => {
     const ctx = new Context()
     await ctx.plugin(MemorySettings).await()
     const fixture = runtimeFixture()
     const subject = new QwenVisionBackend(ctx, {
       backend: 'qwen',
-      modelId: DEFAULT_MODEL_ID,
-      revision: DEFAULT_MODEL_REVISION,
-      dtype: 'q4',
-      device: 'auto',
-      cacheDir: '/tmp/dsh-vision-test-cache',
-      maxNewTokens: 384,
-    }, async () => fixture.runtime as never, false)
+    }, async () => fixture.runtime as never, false, '/tmp/dsh-vision-test-cache')
     await vi.waitFor(() => {
       expect(ctx.settings.describe().map(row => String(row.ns))).toContain('dsh-vision')
     })
 
     await ctx.settings.update(QWEN_VISION_SETTINGS_NAMESPACE, {
-      device: 'cpu',
-      dtype: 'q8',
-      maxNewTokens: 512,
+      modelPreset: 'qwen2-vl-2b',
     })
     await subject.describe({ image })
 
-    expect(fixture.fromModel).toHaveBeenCalledWith(DEFAULT_MODEL_ID, expect.objectContaining({
-      device: 'cpu',
-      dtype: 'q8',
+    expect(fixture.fromModel).toHaveBeenCalledWith('onnx-community/Qwen2-VL-2B-Instruct', expect.objectContaining({
+      device: 'auto',
+      dtype: 'q4',
     }))
-    expect(fixture.generate).toHaveBeenCalledWith(expect.objectContaining({ max_new_tokens: 512 }))
-    expect(subject.model).toContain(':q8:max512')
+    expect(fixture.generate).toHaveBeenCalledWith(expect.objectContaining({ max_new_tokens: 384 }))
+    expect(subject.model).toContain('Qwen2-VL-2B-Instruct@main:q4:max384')
     await ctx.fiber.dispose()
   })
 })

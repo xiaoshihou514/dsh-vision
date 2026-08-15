@@ -6,17 +6,7 @@ import type { VisionSettingsScope } from './vision-settings.ts'
 
 export interface VisionSettings {
   backend?: 'glm' | 'qwen'
-  baseURL?: string
-  apiKeyEnv?: string
-  glmModel?: string
-  glmMaxTokens?: number
-  glmTimeoutMs?: number
-  modelId?: string
-  revision?: string
-  dtype?: 'q4' | 'q4f16' | 'q8' | 'fp16' | 'fp32'
-  device?: 'auto' | 'gpu' | 'cpu' | 'cuda' | 'dml' | 'coreml' | 'webgpu'
-  cacheDir?: string
-  maxNewTokens?: number
+  modelPreset?: 'qwen3-vl-2b' | 'qwen2-vl-2b'
 }
 
 export interface VisionSettingsCardInjected {
@@ -101,21 +91,13 @@ export function VisionSettingsCard({ scope, api }: VisionSettingsCardInjected) {
     setSaving(true)
     setError(null)
     try {
-      const numeric = new Set(['glmMaxTokens', 'glmTimeoutMs', 'maxNewTokens'])
       for (const [name, raw] of Object.entries(draft)) {
         const trimmed = raw.trim()
         if (trimmed === '') await scope.unset(name)
-        else if (numeric.has(name)) {
-          const parsed = Number(trimmed)
-          if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 1) {
-            throw new Error(`${name} 必须是正整数`)
-          }
-          await scope.set(name, parsed)
-        } else await scope.set(name, trimmed)
+        else await scope.set(name, trimmed)
       }
       if (apiKey.trim() !== '') {
-        const ref = read('apiKeyEnv').trim() || 'ZHIPUAI_API_KEY'
-        const response = await api.credentials.set({ ref, value: apiKey.trim() })
+        const response = await api.credentials.set({ ref: 'ZHIPUAI_API_KEY', value: apiKey.trim() })
         if (!response.result.ok) throw new Error(response.result.error.message)
       }
       setDraft({})
@@ -149,18 +131,20 @@ export function VisionSettingsCard({ scope, api }: VisionSettingsCardInjected) {
           </label>
           {backend === 'glm' ? <>
             <Field label="API Key（仅写入凭据存储）" type="password" value={apiKey} disabled={disabled} onChange={setApiKey} />
-            <Field label="凭据名称" value={read('apiKeyEnv')} disabled={disabled} onChange={next => { edit('apiKeyEnv', next) }} />
-            <Field label="API 地址" value={read('baseURL')} disabled={disabled} onChange={next => { edit('baseURL', next) }} />
-            <Field label="GLM 模型" value={read('glmModel')} disabled={disabled} onChange={next => { edit('glmModel', next) }} />
-            <Field label="最大输出 tokens" type="number" value={read('glmMaxTokens')} disabled={disabled} onChange={next => { edit('glmMaxTokens', next) }} />
-            <Field label="超时（毫秒）" type="number" value={read('glmTimeoutMs')} disabled={disabled} onChange={next => { edit('glmTimeoutMs', next) }} />
+            <p style={{ margin: '8px 0 0', color: 'var(--dsw-alias-label-tertiary)', fontSize: 12 }}>
+              还没有密钥？<a href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank" rel="noreferrer">前往智谱开放平台获取 API Key</a>
+            </p>
           </> : <>
-            <Field label="模型仓库" value={read('modelId')} disabled={disabled} onChange={next => { edit('modelId', next) }} />
-            <Field label="模型 revision" value={read('revision')} disabled={disabled} onChange={next => { edit('revision', next) }} />
-            <Field label="权重格式" value={read('dtype')} disabled={disabled} onChange={next => { edit('dtype', next) }} />
-            <Field label="运行设备" value={read('device')} disabled={disabled} onChange={next => { edit('device', next) }} />
-            <Field label="模型缓存目录" value={read('cacheDir')} disabled={disabled} onChange={next => { edit('cacheDir', next) }} />
-            <Field label="最大输出 tokens" type="number" value={read('maxNewTokens')} disabled={disabled} onChange={next => { edit('maxNewTokens', next) }} />
+            <label style={field}>
+              <span style={{ fontSize: 13, fontWeight: 500 }}>本地模型</span>
+              <select style={input} value={read('modelPreset') || 'qwen3-vl-2b'} disabled={disabled} onChange={event => { edit('modelPreset', event.target.value) }}>
+                <option value="qwen3-vl-2b">Qwen3-VL 2B（推荐）</option>
+                <option value="qwen2-vl-2b">Qwen2-VL 2B（兼容）</option>
+              </select>
+            </label>
+            <p style={{ margin: '8px 0 0', color: 'var(--dsw-alias-label-tertiary)', fontSize: 12 }}>
+              自动使用最新模型版本和合适的权重、设备。模型保存在 ~/.dsh/vision。
+            </p>
           </>}
           {error !== null ? <p role="status" style={{ color: 'var(--dsw-alias-label-error)', fontSize: 12 }}>{error}</p> : null}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>

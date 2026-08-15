@@ -1,7 +1,7 @@
 /** Qwen vision backend powered by Transformers.js and ONNX Runtime. @module dsh-vision/qwen-backend */
 
 import { homedir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import type { Context, Logger } from '@deepseek-ai/cordis'
 import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import z from '@deepseek-ai/schemastery'
@@ -14,19 +14,26 @@ import {
   GlmVisionHttpError,
   glmVisionChat,
 } from './glm-backend.ts'
-import {
-  DEFAULT_Q4_MODEL_FILES,
-  discardCorruptModelFiles,
-  modelRevisionRoot,
-  verifyModelFiles,
-  withModelCacheLock,
-} from './model-cache.ts'
+import { withModelCacheLock } from './model-cache.ts'
 
 export const DEFAULT_MODEL_ID = 'onnx-community/Qwen3-VL-2B-Instruct-ONNX'
-export const DEFAULT_MODEL_REVISION = '4739e748dc3798a89254e4932dca19e44aca304a'
+export const DEFAULT_MODEL_REVISION = 'main'
 export const DEFAULT_MAX_NEW_TOKENS = 384
+export const DEFAULT_CACHE_DIR = join(homedir(), '.dsh', 'vision')
+export const GLM_API_KEY_CREDENTIAL = 'ZHIPUAI_API_KEY'
 /** User-owned settings section exposed by the Harness plugin configuration UI. */
 export const QWEN_VISION_SETTINGS_NAMESPACE = settingsNamespace('dsh-vision')
+
+export const QWEN_MODEL_PRESETS = {
+  'qwen3-vl-2b': {
+    label: 'Qwen3-VL 2B（推荐）',
+    modelId: DEFAULT_MODEL_ID,
+  },
+  'qwen2-vl-2b': {
+    label: 'Qwen2-VL 2B（兼容）',
+    modelId: 'onnx-community/Qwen2-VL-2B-Instruct',
+  },
+} as const
 
 type Transformers = typeof import('@huggingface/transformers')
 type QwenModel = Awaited<ReturnType<Transformers['AutoModelForImageTextToText']['from_pretrained']>>
@@ -38,24 +45,12 @@ interface LoadedQwen {
   runtime: Transformers
 }
 
-export type QwenDevice = 'auto' | 'gpu' | 'cpu' | 'cuda' | 'dml' | 'coreml' | 'webgpu'
-export type QwenDtype = 'q4' | 'q4f16' | 'q8' | 'fp16' | 'fp32'
+export type QwenModelPreset = keyof typeof QWEN_MODEL_PRESETS
 export type VisionBackendKind = 'glm' | 'qwen'
 
 export interface Config {
   backend?: VisionBackendKind
-  baseURL?: string
-  apiKeyEnv?: string
-  glmModel?: string
-  glmMaxTokens?: number
-  glmTimeoutMs?: number
-  modelId?: string
-  revision?: string
-  dtype?: QwenDtype
-  /** `auto` tries native GPU providers before CPU. */
-  device?: QwenDevice
-  cacheDir?: string
-  maxNewTokens?: number
+  modelPreset?: QwenModelPreset
 }
 
 interface ResolvedConfig {
@@ -67,46 +62,34 @@ interface ResolvedConfig {
   glmTimeoutMs: number
   modelId: string
   revision: string
-  dtype: QwenDtype
-  device: QwenDevice
+  dtype: 'q4'
+  device: 'auto'
   cacheDir: string
   maxNewTokens: number
 }
 
 export const Config: z<Config> = z.object({
   backend: z.union(['glm', 'qwen'] as const).default('glm'),
-  baseURL: z.string().default(DEFAULT_GLM_BASE_URL),
-  apiKeyEnv: z.string().default('ZHIPUAI_API_KEY'),
-  glmModel: z.string().default(DEFAULT_GLM_MODEL),
-  glmMaxTokens: z.number().step(1).min(1).max(32768).default(2048),
-  glmTimeoutMs: z.number().step(1).min(1000).max(300000).default(60000),
-  modelId: z.string().default(DEFAULT_MODEL_ID),
-  revision: z.string().default(DEFAULT_MODEL_REVISION),
-  dtype: z.union(['q4', 'q4f16', 'q8', 'fp16', 'fp32'] as const).default('q4'),
-  device: z.union(['auto', 'gpu', 'cpu', 'cuda', 'dml', 'coreml', 'webgpu'] as const).default('auto'),
-  cacheDir: z.string(),
-  maxNewTokens: z.number().step(1).min(1).max(2048).default(DEFAULT_MAX_NEW_TOKENS),
+  modelPreset: z.union(['qwen3-vl-2b', 'qwen2-vl-2b'] as const).default('qwen3-vl-2b'),
 })
 
-function defaultCacheDir(): string {
-  const dshHome = process.env.DSH_HOME?.trim()
-  return resolve(join(dshHome === undefined || dshHome === '' ? join(homedir(), '.dsh') : dshHome, 'models', 'dsh-vision'))
-}
-
 function resolveConfig(config: Config): ResolvedConfig {
+  const preset = QWEN_MODEL_PRESETS[config.modelPreset ?? 'qwen3-vl-2b']
   return {
     backend: config.backend ?? 'glm',
-    baseURL: config.baseURL ?? DEFAULT_GLM_BASE_URL,
-    apiKeyEnv: config.apiKeyEnv ?? 'ZHIPUAI_API_KEY',
-    glmModel: config.glmModel ?? DEFAULT_GLM_MODEL,
-    glmMaxTokens: config.glmMaxTokens ?? 2048,
-    glmTimeoutMs: config.glmTimeoutMs ?? 60000,
-    modelId: config.modelId ?? DEFAULT_MODEL_ID,
-    revision: config.revision ?? DEFAULT_MODEL_REVISION,
-    dtype: config.dtype ?? 'q4',
-    device: config.device ?? 'auto',
-    cacheDir: resolve(config.cacheDir ?? defaultCacheDir()),
-    maxNewTokens: config.maxNewTokens ?? DEFAULT_MAX_NEW_TOKENS,
+    baseURL: DEFAULT_GLM_BASE_URL,
+    apiKeyEnv: GLM_API_KEY_CREDENTIAL,
+    glmModel: DEFAULT_GLM_MODEL,
+    glmMaxTokens: 2048,
+    glmTimeoutMs: 60000,
+    modelId: preset.modelId,
+    revision: DEFAULT_MODEL_REVISION,
+    // Transformers.js resolves literal "auto" + auto device to FP32. Q4 is the
+    // portable automatic policy for these presets and keeps first-run memory sane.
+    dtype: 'q4',
+    device: 'auto',
+    cacheDir: DEFAULT_CACHE_DIR,
+    maxNewTokens: DEFAULT_MAX_NEW_TOKENS,
   }
 }
 
@@ -150,7 +133,7 @@ function analysisPrompt(focus: string | undefined): string {
 /** Qwen3-VL implementation that automatically prefers an available GPU. */
 export class QwenVisionBackend extends VisionBackend {
   get promptVersion(): string {
-    return resolveConfig(this.source()).backend === 'glm' ? 'glm-evidence-v1' : 'qwen-evidence-v1'
+    return this.config().backend === 'glm' ? 'glm-evidence-v1' : 'qwen-evidence-v1'
   }
   private loaded: { key: string; promise: Promise<LoadedQwen> } | undefined
   private inferenceTail: Promise<void> = Promise.resolve()
@@ -159,7 +142,7 @@ export class QwenVisionBackend extends VisionBackend {
 
   /** Current derivation identity; settings changes create distinct durable evidence. */
   get model(): string {
-    const config = resolveConfig(this.source())
+    const config = this.config()
     if (config.backend === 'glm') return `${config.glmModel}:max${config.glmMaxTokens}`
     return `${config.modelId}@${config.revision}:${config.dtype}:max${config.maxNewTokens}`
   }
@@ -168,11 +151,13 @@ export class QwenVisionBackend extends VisionBackend {
     ctx: Context,
     config: Config,
     private readonly loadRuntime: () => Promise<Transformers> = () => import('@huggingface/transformers'),
-    private readonly verifyDefaultModel = true,
+    _verifyDefaultModel = true,
+    private readonly cacheDir = DEFAULT_CACHE_DIR,
   ) {
     super(ctx)
     this.logger = ctx.logger('dsh-vision')
     const entry = resolveConfig(config)
+    entry.cacheDir = cacheDir
     this.source = () => entry
     installSettingsSection(ctx, QWEN_VISION_SETTINGS_NAMESPACE, Config, entry, {
       setSource: (source) => {
@@ -193,8 +178,14 @@ export class QwenVisionBackend extends VisionBackend {
     return run
   }
 
-  private async infer(request: VisionBackendRequest): Promise<string> {
+  private config(): ResolvedConfig {
     const config = resolveConfig(this.source())
+    config.cacheDir = this.cacheDir
+    return config
+  }
+
+  private async infer(request: VisionBackendRequest): Promise<string> {
+    const config = this.config()
     if (config.backend === 'glm') return this.inferGlm(request, config)
     const loaded = await waitFor(this.load(config), request.signal)
     const bytes = request.image.data.slice().buffer as ArrayBuffer
@@ -301,12 +292,6 @@ export class QwenVisionBackend extends VisionBackend {
           'vision_encoder_q4.onnx': 1,
         } } : {},
       }
-      const verifiesDefault = this.verifyDefaultModel
-        && config.modelId === DEFAULT_MODEL_ID
-        && config.revision === DEFAULT_MODEL_REVISION
-        && config.dtype === 'q4'
-      const revisionRoot = modelRevisionRoot(config.cacheDir, config.modelId, config.revision)
-      if (verifiesDefault) await discardCorruptModelFiles(revisionRoot, DEFAULT_Q4_MODEL_FILES)
       const processorPromise = runtime.AutoProcessor.from_pretrained(config.modelId, options)
       // Model and processor loading overlap. Attach a handler immediately so a fast
       // processor failure cannot become an unhandled rejection while GPU fallback runs.
@@ -324,7 +309,6 @@ export class QwenVisionBackend extends VisionBackend {
         })
       }
       const processor = await processorPromise
-      if (verifiesDefault) await verifyModelFiles(revisionRoot, DEFAULT_Q4_MODEL_FILES)
       return { model, processor, runtime }
     })
   }

@@ -14,7 +14,7 @@ const imagePath = process.env.DSH_VISION_E2E_IMAGE
 const run = imagePath === undefined ? describe.skip : describe
 
 run('QwenVisionBackend end to end', () => {
-  it('answers a focused visual question with the pinned local model', async () => {
+  it('answers a focused visual question with the selected local model', async () => {
     const data = await readFile(imagePath!)
     const image = {
       ref: {
@@ -28,13 +28,8 @@ run('QwenVisionBackend end to end', () => {
     } as unknown as StoredImageAttachment
     const backend = new QwenVisionBackend(new Context(), {
       backend: 'qwen',
-      modelId: DEFAULT_MODEL_ID,
-      revision: DEFAULT_MODEL_REVISION,
-      dtype: 'q4',
-      device: 'auto',
-      cacheDir: process.env.DSH_VISION_E2E_CACHE ?? '.cache/e2e-models',
-      maxNewTokens: DEFAULT_MAX_NEW_TOKENS,
-    })
+      modelPreset: process.env.DSH_VISION_E2E_PRESET === 'qwen2-vl-2b' ? 'qwen2-vl-2b' : 'qwen3-vl-2b',
+    }, undefined, true, process.env.DSH_VISION_E2E_CACHE)
 
     const description = await backend.describe({ image, focus: 'Describe the logo and transcribe its text.' })
 

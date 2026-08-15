@@ -20,7 +20,10 @@ export {
   DEFAULT_MAX_NEW_TOKENS,
   DEFAULT_MODEL_ID,
   DEFAULT_MODEL_REVISION,
+  DEFAULT_CACHE_DIR,
+  GLM_API_KEY_CREDENTIAL,
+  QWEN_MODEL_PRESETS,
   QWEN_VISION_SETTINGS_NAMESPACE,
   QwenVisionBackend,
 } from './qwen-backend.ts'
-export type { QwenDevice, QwenDtype, VisionBackendKind } from './qwen-backend.ts'
+export type { QwenModelPreset, VisionBackendKind } from './qwen-backend.ts'
