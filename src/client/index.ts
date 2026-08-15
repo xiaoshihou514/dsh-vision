@@ -12,7 +12,7 @@ import type { VisionSettingsCardInjected } from "./VisionSettingsCard.tsx";
 import { VisionSettingsScope } from "./vision-settings.ts";
 
 /** Required services (fiber inject). */
-export const inject = ["connection", "slots"];
+export const inject = ["connection", "conversation", "slots"];
 
 /**
  * Mount the composer entry: an "upload image" control that translates the
@@ -22,14 +22,19 @@ export const inject = ["connection", "slots"];
  */
 export function apply(ctx: ClientContext): void {
   const { api } = ctx.get("connection") as { api: IApiClient };
-  ctx.inject(["slots"], (scope) => {
+  ctx.inject(["conversation", "slots"], (scope) => {
+    const { blocks } = scope.conversation;
     scope.slots.inject("conversation.input.left", () =>
       scope.slots.register(
         {
           name: "conversation.input.left",
           id: "dsh-vision-upload",
           order: 100,
-          inject: (sessionId): UploadButtonInjected => ({ api, sessionId }),
+          inject: (sessionId): UploadButtonInjected => ({
+            api,
+            sessionId,
+            blocks,
+          }),
         },
         UploadButton,
       ),
