@@ -24,6 +24,9 @@ describe('Harness bundle', () => {
     expect(JSON.stringify(patch)).not.toContain('transformers-backend')
     expect(JSON.stringify(patch)).not.toContain('vision-adapter')
     expect(JSON.stringify(patch)).not.toContain('agent-default-model')
+    expect(patch).toEqual([expect.objectContaining({
+      insert: expect.arrayContaining([expect.objectContaining({ name: 'dsh-vision' })]),
+    })])
     expect(manifest.exports).toHaveProperty('./qwen-backend')
     expect(manifest.exports?.['./client']).toEqual(expect.objectContaining({
       types: './lib/client.d.ts',

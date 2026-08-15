@@ -98,4 +98,11 @@ declare class QwenVisionBackend extends VisionBackend {
   private loadFresh;
 }
 //#endregion
-export { DEFAULT_GLM_BASE_URL, DEFAULT_GLM_FALLBACK_MODELS, DEFAULT_GLM_MODEL, DEFAULT_MAX_NEW_TOKENS, DEFAULT_MODEL_ID, DEFAULT_MODEL_REVISION, GlmVisionHttpError, type GlmVisionRequest, QWEN_VISION_SETTINGS_NAMESPACE, type QwenDevice, type QwenDtype, QwenVisionBackend, VisionBackend, type VisionBackendKind, type VisionBackendRequest, glmVisionChat };
+//#region src/index.d.ts
+/** Local vision bridge for DeepSeek Harness. @module dsh-vision */
+/** Root loader entry used to make the package's browser contribution discoverable. */
+declare const name = "vision-client-bridge";
+/** The root entry owns no host behavior; functional host plugins use exported subpaths. */
+declare function apply(): void;
+//#endregion
+export { DEFAULT_GLM_BASE_URL, DEFAULT_GLM_FALLBACK_MODELS, DEFAULT_GLM_MODEL, DEFAULT_MAX_NEW_TOKENS, DEFAULT_MODEL_ID, DEFAULT_MODEL_REVISION, GlmVisionHttpError, type GlmVisionRequest, QWEN_VISION_SETTINGS_NAMESPACE, type QwenDevice, type QwenDtype, QwenVisionBackend, VisionBackend, type VisionBackendKind, type VisionBackendRequest, apply, glmVisionChat, name };

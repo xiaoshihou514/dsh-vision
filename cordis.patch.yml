@@ -1,6 +1,11 @@
 # Add image analysis without replacing or wrapping the selected text model.
 
 - insert:
+    # Root package row: Harness discovers dsh.client bundles only from enabled
+    # package roots. This plugin is intentionally a no-op on the host.
+    - id: vision-client
+      name: 'dsh-vision'
+
     - id: vision-qwen-backend
       name: 'dsh-vision/qwen-backend'
       config:
