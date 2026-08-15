@@ -30,6 +30,7 @@ describe('Harness bundle', () => {
     expect(JSON.stringify(patch)).toContain('dsh-vision/vision-preprocessor')
     expect(JSON.stringify(patch)).not.toContain('transformers-backend')
     expect(JSON.stringify(patch)).not.toContain('vision-adapter')
+    expect(JSON.stringify(patch)).not.toContain('vision-upload')
     expect(JSON.stringify(patch)).not.toContain('agent-default-model')
     expect(patch).toEqual([
       expect.objectContaining({
@@ -40,6 +41,7 @@ describe('Harness bundle', () => {
     ])
     expect(manifest.exports).toHaveProperty('./qwen-backend')
     expect(manifest.exports).toHaveProperty('./vision-preprocessor')
+    expect(manifest.exports).not.toHaveProperty('./vision-upload')
     expect(manifest.exports?.['./client']).toEqual(
       expect.objectContaining({
         types: './lib/client.d.ts',
@@ -47,10 +49,7 @@ describe('Harness bundle', () => {
       }),
     )
     expect(manifest.dsh?.client?.inject).toEqual(
-      expect.arrayContaining([
-        '@deepseek-ai/dsh-client-ui-conversation',
-        '@deepseek-ai/dsh-client-ui-settings-plugins',
-      ]),
+      expect.arrayContaining(['@deepseek-ai/dsh-client-ui-settings-plugins']),
     )
   })
 })

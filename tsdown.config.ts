@@ -8,7 +8,6 @@ const NODE_ENTRIES = [
   'glm-backend',
   'vision-tool',
   'vision-preprocessor',
-  'vision-upload',
 ] as const
 
 export default defineConfig([

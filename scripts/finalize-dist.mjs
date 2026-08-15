@@ -20,8 +20,6 @@ const expected = [
   'vision-preprocessor.js',
   'vision-tool.d.ts',
   'vision-tool.js',
-  'vision-upload.d.ts',
-  'vision-upload.js',
 ]
 const actual = (await readdir(output)).sort()
 if (JSON.stringify(actual) !== JSON.stringify(expected)) {

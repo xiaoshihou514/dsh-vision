@@ -16,6 +16,3 @@
 
     - id: vision-preprocessor
       name: 'dsh-vision/vision-preprocessor'
-
-    - id: vision-upload
-      name: 'dsh-vision/vision-upload'

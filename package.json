@@ -28,10 +28,6 @@
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json",
-    "./vision-upload": {
-      "types": "./lib/vision-upload.d.ts",
-      "default": "./lib/vision-upload.js"
-    },
     "./client": {
       "types": "./lib/client.d.ts",
       "default": "./lib/client.js"
@@ -64,7 +60,6 @@
         "@deepseek-ai/dsh-client-connection",
         "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-slots",
-        "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-ui-settings-plugins"
       ]
     }
@@ -105,7 +100,6 @@
     "@deepseek-ai/dsh-client-runtime": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-client-ui-slots": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-client-connection": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-client-ui-conversation": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-client-ui-settings-plugins": "^0.1.0-rc.6"
   },
   "license": "MIT",

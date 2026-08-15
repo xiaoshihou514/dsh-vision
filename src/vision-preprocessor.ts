@@ -3,7 +3,11 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type {} from "@deepseek-ai/dsh-agent";
 import type { AttachmentStore } from "@deepseek-ai/dsh-attachment";
-import type { ContentBlock, UserMessage } from "@deepseek-ai/dsh-llm";
+import {
+  createUserMessage,
+  type ContentBlock,
+  type UserMessage,
+} from "@deepseek-ai/dsh-llm";
 import type { VisionBackend } from "./backend.ts";
 
 export const name = "vision-preprocessor";
@@ -17,7 +21,19 @@ function focusOf(message: UserMessage): string | undefined {
   return text === "" ? undefined : text;
 }
 
-/** Replace image blocks without changing message identity, source, or text order. */
+function imageMarker(names: string[]): ContentBlock {
+  const label =
+    names.length === 1 ? "图片已识别" : `已识别 ${names.length} 张图片`;
+  return {
+    type: "text",
+    text: names.length === 0 ? label : `${label}：${names.join("、")}`,
+  };
+}
+
+/**
+ * Keep user-authored text visible and move generated evidence into a collapsed
+ * context message. No returned message contains an image block.
+ */
 export async function transcribeImages(
   attachments: AttachmentStore,
   backend: VisionBackend,
@@ -27,29 +43,49 @@ export async function transcribeImages(
   const rewritten: UserMessage[] = [];
   for (const message of messages) {
     const focus = focusOf(message);
-    const content: ContentBlock[] = [];
-    let changed = false;
+    const visible: ContentBlock[] = [];
+    const evidence: string[] = [];
+    const names: string[] = [];
     for (const block of message.content) {
       if (block.type !== "image") {
-        content.push(block);
+        visible.push(block);
         continue;
       }
       signal.throwIfAborted();
       const image = await attachments.readImage(block.attachment, signal);
-      const evidence = await backend.describe({
+      const description = await backend.describe({
         image,
         ...(focus === undefined ? {} : { focus }),
         signal,
       });
       signal.throwIfAborted();
-      const label =
-        image.ref.name === undefined
-          ? "Image evidence"
-          : `Image evidence: ${image.ref.name}`;
-      content.push({ type: "text", text: `[${label}]\n${evidence}` });
-      changed = true;
+      const name = image.ref.name;
+      if (name !== undefined) names.push(name);
+      const label = name === undefined ? "Image" : `Image: ${name}`;
+      evidence.push(`[${label}]\n${description}`);
     }
-    rewritten.push(changed ? { ...message, content } : message);
+    if (evidence.length === 0) {
+      rewritten.push(message);
+      continue;
+    }
+    // An image-only prompt still needs a small visible record after its native
+    // composer preview is consumed; generated visual details stay out of it.
+    if (visible.length === 0) visible.push(imageMarker(names));
+    rewritten.push(
+      { ...message, content: visible },
+      createUserMessage({
+        source: {
+          kind: "plugin",
+          plugin: "dsh-vision",
+          form: "notice",
+          summary:
+            evidence.length === 1
+              ? "已读取 1 张图片"
+              : `已读取 ${evidence.length} 张图片`,
+        },
+        content: [{ type: "text", text: evidence.join("\n\n") }],
+      }),
+    );
   }
   return rewritten;
 }

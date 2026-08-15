@@ -1,6 +1,6 @@
+import { UserMessage } from "@deepseek-ai/dsh-llm";
 import { Context, Service } from "@deepseek-ai/cordis";
 import { AttachmentStore, StoredImageAttachment } from "@deepseek-ai/dsh-attachment";
-import { UserMessage } from "@deepseek-ai/dsh-llm";
 //#region src/backend.d.ts
 declare module "@deepseek-ai/cordis" {
   interface Context {
@@ -34,7 +34,10 @@ declare abstract class VisionBackend extends Service {
 //#region src/vision-preprocessor.d.ts
 declare const name = "vision-preprocessor";
 declare const inject: string[];
-/** Replace image blocks without changing message identity, source, or text order. */
+/**
+ * Keep user-authored text visible and move generated evidence into a collapsed
+ * context message. No returned message contains an image block.
+ */
 declare function transcribeImages(attachments: AttachmentStore, backend: VisionBackend, messages: UserMessage[], signal: AbortSignal): Promise<UserMessage[]>;
 /** Install the adapter-neutral image-to-text boundary for every Agent input. */
 declare function apply(ctx: Context): void;

@@ -1,45 +1,23 @@
-/** Browser half: composer upload-and-recognize entry. @module dsh-vision/client */
+/** Browser half: vision settings; image intake is owned by the native composer. @module dsh-vision/client */
 
 import type {} from "@deepseek-ai/dsh-client-ui-slots";
 import type {} from "@deepseek-ai/dsh-client-ui-settings-plugins/client";
-import type {} from "@deepseek-ai/dsh-client-ui-conversation/client";
 import type { ClientContext } from "@deepseek-ai/dsh-client-runtime/client";
 import type { IApiClient } from "@deepseek-ai/dsh-client-connection/client";
-import { UploadButton } from "./UploadButton.tsx";
-import type { UploadButtonInjected } from "./UploadButton.tsx";
 import { VisionSettingsCard } from "./VisionSettingsCard.tsx";
 import type { VisionSettingsCardInjected } from "./VisionSettingsCard.tsx";
 import { VisionSettingsScope } from "./vision-settings.ts";
 
 /** Required services (fiber inject). */
-export const inject = ["connection", "conversation", "slots"];
+export const inject = ["connection", "slots"];
 
 /**
- * Mount the composer entry: an "upload image" control that translates the
- * selected image through the dsh-vision endpoint and submits the evidence as
- * a plain-text message, bypassing harness image admission entirely.
+ * Mount plugin settings. The Harness composer already owns native image
+ * selection, previews, paste, drag/drop, and attachment submission.
  * @param ctx - the browser plugin context.
  */
 export function apply(ctx: ClientContext): void {
   const { api } = ctx.get("connection") as { api: IApiClient };
-  ctx.inject(["conversation", "slots"], (scope) => {
-    const { blocks } = scope.conversation;
-    scope.slots.inject("conversation.input.left", () =>
-      scope.slots.register(
-        {
-          name: "conversation.input.left",
-          id: "dsh-vision-upload",
-          order: 100,
-          inject: (sessionId): UploadButtonInjected => ({
-            api,
-            sessionId,
-            blocks,
-          }),
-        },
-        UploadButton,
-      ),
-    );
-  });
   const settings = new VisionSettingsScope();
   ctx.slots.inject("settings.plugin.item", function* () {
     yield ctx.slots.register(

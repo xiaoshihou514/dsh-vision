@@ -1,33 +1,40 @@
-# Composable image transcription
+# Native image intake and composable transcription
 
 ## Problem
 
-The browser upload control translated images before submitting its own message, but the normal composer stayed active during that work. A user could therefore send the draft first and get an answer before the visual evidence arrived.
+The first browser integration added its own upload button, translated the image immediately, and submitted the generated description as a separate prompt. That duplicated the Harness composer, exposed machine-generated text as if the user had sent it, and made prompt timing difficult to understand.
 
-Images arriving from another plugin followed a different path. In particular, dsh-weixin correctly produced the Harness's provider-neutral image block, but that block reached the DeepSeek chat-completions adapter unchanged. The adapter is text-only and rejected the whole turn.
+External producers had the opposite problem. dsh-weixin correctly created provider-neutral image blocks, but the text-only DeepSeek adapter rejected them before a response could start.
 
-## Decision
+## Current design
 
-There are now two boundaries, each using a native Harness contract:
+The browser plugin no longer owns image intake. The Harness composer already provides the expected attachment picker, thumbnail rail above the text field, paste and drag/drop support, validation, and one combined text-and-image submission. dsh-vision only contributes its settings card on the client.
 
-- The upload control registers a session composer block for the complete translate-and-submit operation. The send button and Enter shortcut both consume this registry, so they are disabled together. Cleanup is ownership-aware: dsh-vision only removes its own reason and cannot accidentally clear a block installed by another plugin.
-- A host-side `agent/pre-step` interceptor converts image blocks from any producer into plain-text visual evidence. It runs after downstream pre-step handlers, reads the durable attachment through the attachment service, and uses the selected dsh-vision backend. The rewritten message retains its id, source, ordinary text, and block order.
+On the host, `vision-preprocessor` listens at `agent/pre-step` after downstream handlers. For every image-bearing user message it:
 
-The second boundary is deliberately producer- and model-independent. dsh-weixin does not need to import dsh-vision or know whether the current model accepts images. Conversely, dsh-vision does not invent model variants or special routes. With the plugin enabled, visual input has one predictable meaning: transcribe it before it reaches an adapter.
+1. reads each durable attachment through the attachment service;
+2. asks the configured vision backend for evidence, using the user's text as focus;
+3. removes image blocks from the visible user message while retaining its id, source, and authored text;
+4. emits the evidence as an adjacent `dsh-vision` plugin message with `form: notice`.
+
+The standard conversation UI renders notice context as a collapsed row. Generated evidence therefore does not appear in the user bubble, while the model receives durable text-only context. An image-only prompt gets a small `图片已识别` marker so its submitted turn does not become visually empty.
+
+This boundary is producer-independent. Native desktop uploads, dsh-weixin, and future plugins all use the same provider-neutral image block and need no direct dependency on dsh-vision. No synthetic model routes are introduced.
+
+## Known limitation
+
+The native thumbnail is visible while composing, but the submitted transcript cannot retain the image block under the current Harness contract. Append-origin transcript messages are also the model-visible surface, so retaining the image would make DeepSeek reject reconstructed requests. A future upstream post-append, pre-derivation surface-replacement hook could preserve the original image in history while keeping only evidence on the model surface.
 
 ## Failure behavior
 
-If attachment reading or transcription fails, the Agent step fails before the raw image reaches the model adapter. We do not silently discard the image or retry the request without visual evidence.
+Attachment or transcription failure stops the step before a raw image reaches the adapter. The plugin does not silently discard an image or retry without its evidence. Cancellation propagates through attachment reading and inference.
 
-The browser lock remains held until evidence submission returns, including error paths. A transcription failure is shown next to the upload control and the composer becomes available again.
+## Verification targets
 
-## Verification
-
-Regression tests cover:
-
-- acquiring and releasing the native composer block;
-- preserving blockers owned by other plugins;
-- rewriting a dsh-weixin-style plugin message to text-only evidence;
-- retaining message identity, source, user text, and block order;
-- leaving text-only messages untouched;
-- shipping and loading the preprocessor entry in the Cordis bundle.
+- native image intake is not duplicated by the client bundle;
+- user-authored text remains the visible message;
+- generated evidence is isolated in collapsed plugin context;
+- no returned model-facing message contains an image block;
+- image-only input retains a small visible marker;
+- text-only messages preserve object identity and do not invoke the backend;
+- the preprocessor is included in the Cordis bundle and published exports.
