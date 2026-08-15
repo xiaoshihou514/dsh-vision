@@ -2,6 +2,9 @@ import { Context } from '@deepseek-ai/cordis'
 import type { StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { SettingsProvider } from '@deepseek-ai/dsh-settings'
 import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
   DEFAULT_MODEL_ID,
@@ -151,6 +154,27 @@ describe('QwenVisionBackend', () => {
     await expect(subject.describe({ image })).resolves.toContain('Revenue 2026')
     expect(fixture.fromModel).toHaveBeenCalledTimes(2)
     expect(fixture.fromModel.mock.calls[1]?.[1]).toMatchObject({ device: 'cpu' })
+  })
+
+  it('loads cached processor metadata without a remote metadata probe', async () => {
+    const cache = await mkdtemp(join(tmpdir(), 'dsh-vision-processor-'))
+    const localModel = join(cache, DEFAULT_MODEL_ID)
+    await mkdir(localModel, { recursive: true })
+    await Promise.all([
+      writeFile(join(localModel, 'preprocessor_config.json'), '{}'),
+      writeFile(join(localModel, 'tokenizer.json'), '{}'),
+      writeFile(join(localModel, 'tokenizer_config.json'), '{}'),
+    ])
+    try {
+      const fixture = runtimeFixture()
+      const subject = new QwenVisionBackend(new Context(), { backend: 'qwen' }, async () => fixture.runtime as never, false, cache)
+
+      await subject.describe({ image })
+
+      expect(fixture.fromProcessor).toHaveBeenCalledWith(localModel, expect.any(Object))
+    } finally {
+      await rm(cache, { recursive: true, force: true })
+    }
   })
 
   it('applies native plugin settings to the next inference and its evidence identity', async () => {

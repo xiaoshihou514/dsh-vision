@@ -1,6 +1,7 @@
 /** Qwen vision backend powered by Transformers.js and ONNX Runtime. @module dsh-vision/qwen-backend */
 
 import { homedir } from "node:os";
+import { access } from "node:fs/promises";
 import { join } from "node:path";
 import type { Context, Logger } from "@deepseek-ai/cordis";
 import { credentialRef } from "@deepseek-ai/dsh-credentials";
@@ -131,6 +132,20 @@ function waitFor<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
       .then(resolvePromise, reject)
       .finally(() => signal.removeEventListener("abort", aborted));
   });
+}
+
+async function processorSource(config: ResolvedConfig): Promise<string> {
+  const local = join(config.cacheDir, config.modelId);
+  try {
+    await Promise.all([
+      access(join(local, "preprocessor_config.json")),
+      access(join(local, "tokenizer.json")),
+      access(join(local, "tokenizer_config.json")),
+    ]);
+    return local;
+  } catch {
+    return config.modelId;
+  }
 }
 
 function analysisPrompt(focus: string | undefined): string {
@@ -370,9 +385,8 @@ export class QwenVisionBackend extends VisionBackend {
             }
           : {}),
       };
-      const processorPromise = runtime.AutoProcessor.from_pretrained(
-        config.modelId,
-        options,
+      const processorPromise = processorSource(config).then((source) =>
+        runtime.AutoProcessor.from_pretrained(source, options),
       );
       // Model and processor loading overlap. Attach a handler immediately so a fast
       // processor failure cannot become an unhandled rejection while GPU fallback runs.
