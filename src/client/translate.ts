@@ -1,35 +1,36 @@
 /** Browser-side translation channel: image bytes in, evidence text out. @module dsh-vision/client/translate */
 
-import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
-import type { IApiClient } from '@deepseek-ai/dsh-client-connection/client'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { ImageMediaType } from "@deepseek-ai/dsh-attachment";
+import type { IApiClient } from "@deepseek-ai/dsh-client-connection/client";
+import type { SessionId } from "@deepseek-ai/dsh-session";
 
 /** Endpoint registered by the dsh-vision server plugin. */
-export const UPLOAD_ENDPOINT = '/dsh-vision/vision'
+export const UPLOAD_ENDPOINT = "/dsh-vision/vision";
 /** Custom header the endpoint requires (cross-site preflight shield). */
-export const UPLOAD_HEADER = 'x-dsh-vision'
+export const UPLOAD_HEADER = "x-dsh-vision";
 /** Header value the server endpoint verifies. */
-export const UPLOAD_HEADER_VALUE = 'dsh-vision'
+export const UPLOAD_HEADER_VALUE = "dsh-vision";
 
 /** One client-submitted translation request. */
 export interface TranslatePayload {
-  mediaType: ImageMediaType
+  mediaType: ImageMediaType;
   /** Base64-encoded image bytes. */
-  data: string
+  data: string;
   /** Optional display name surfaced to the evidence record. */
-  name?: string
+  name?: string;
   /** Optional user text steering which visual details matter. */
-  focus?: string
+  focus?: string;
 }
 
 /** Translation outcome handed to the composer. */
-export type TranslateResult = { ok: true; text: string } | { ok: false; error: string }
+export type TranslateResult =
+  { ok: true; text: string } | { ok: false; error: string };
 
 export interface TranslateOptions {
-  endpoint?: string
-  header?: string
-  headerValue?: string
-  fetch?: typeof fetch
+  endpoint?: string;
+  header?: string;
+  headerValue?: string;
+  fetch?: typeof fetch;
 }
 
 /**
@@ -40,31 +41,53 @@ export interface TranslateOptions {
  * @param options - endpoint/header overrides and the fetch implementation (tests).
  * @returns evidence text on success, or a user-facing error.
  */
-export async function translateImage(payload: TranslatePayload, options: TranslateOptions = {}): Promise<TranslateResult> {
-  const endpoint = options.endpoint ?? UPLOAD_ENDPOINT
-  const header = options.header ?? UPLOAD_HEADER
-  const headerValue = options.headerValue ?? UPLOAD_HEADER_VALUE
+export async function translateImage(
+  payload: TranslatePayload,
+  options: TranslateOptions = {},
+): Promise<TranslateResult> {
+  const endpoint = options.endpoint ?? UPLOAD_ENDPOINT;
+  const header = options.header ?? UPLOAD_HEADER;
+  const headerValue = options.headerValue ?? UPLOAD_HEADER_VALUE;
   try {
     const response = await (options.fetch ?? fetch)(endpoint, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'content-type': 'application/json',
+        "content-type": "application/json",
         [header]: headerValue,
       },
       body: JSON.stringify({
         mediaType: payload.mediaType,
         data: payload.data,
-        ...payload.name === undefined || payload.name === '' ? {} : { name: payload.name },
-        ...payload.focus === undefined || payload.focus === '' ? {} : { focus: payload.focus },
+        ...(payload.name === undefined || payload.name === ""
+          ? {}
+          : { name: payload.name }),
+        ...(payload.focus === undefined || payload.focus === ""
+          ? {}
+          : { focus: payload.focus }),
       }),
-    })
-    const body = await response.json() as { ok?: boolean; text?: string; error?: string }
-    if (!response.ok || body.ok !== true || typeof body.text !== 'string' || body.text.length === 0) {
-      return { ok: false, error: body.error ?? `translation failed (${response.status})` }
+    });
+    const body = (await response.json()) as {
+      ok?: boolean;
+      text?: string;
+      error?: string;
+    };
+    if (
+      !response.ok ||
+      body.ok !== true ||
+      typeof body.text !== "string" ||
+      body.text.length === 0
+    ) {
+      return {
+        ok: false,
+        error: body.error ?? `translation failed (${response.status})`,
+      };
     }
-    return { ok: true, text: body.text }
+    return { ok: true, text: body.text };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
@@ -75,28 +98,36 @@ export async function translateImage(payload: TranslatePayload, options: Transla
  */
 export function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader()
+    const reader = new FileReader();
     reader.onload = () => {
-      const result = reader.result
-      if (typeof result !== 'string') {
-        reject(new Error('could not read the selected file'))
-        return
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("could not read the selected file"));
+        return;
       }
-      const comma = result.indexOf(',')
-      resolve(comma === -1 ? result : result.slice(comma + 1))
-    }
-    reader.onerror = () => reject(new Error('could not read the selected file'))
-    reader.readAsDataURL(file)
-  })
+      const comma = result.indexOf(",");
+      resolve(comma === -1 ? result : result.slice(comma + 1));
+    };
+    reader.onerror = () =>
+      reject(new Error("could not read the selected file"));
+    reader.readAsDataURL(file);
+  });
 }
 
 /** Whether a browser file's media type is accepted by the translation endpoint. */
-export function supportedImageType(mediaType: string): mediaType is ImageMediaType {
-  return mediaType === 'image/png' || mediaType === 'image/jpeg' || mediaType === 'image/webp' || mediaType === 'image/gif'
+export function supportedImageType(
+  mediaType: string,
+): mediaType is ImageMediaType {
+  return (
+    mediaType === "image/png" ||
+    mediaType === "image/jpeg" ||
+    mediaType === "image/webp" ||
+    mediaType === "image/gif"
+  );
 }
 
 /** Session-prompt client narrowed to the plain-text submission the composer entry performs. */
-export type EvidenceSubmitter = Pick<IApiClient, 'sessions'>
+export type EvidenceSubmitter = Pick<IApiClient, "sessions">;
 
 /**
  * Submit translated evidence as a plain-text message. Text-only content never
@@ -114,12 +145,16 @@ export async function submitEvidence(
   try {
     const response = await api.sessions.prompt({
       sessionId,
-      mode: 'queue',
-      content: [{ type: 'text', text }],
-    })
-    if (!response.result.ok) return { ok: false, error: response.result.error.message }
-    return { ok: true }
+      mode: "queue",
+      content: [{ type: "text", text }],
+    });
+    if (!response.result.ok)
+      return { ok: false, error: response.result.error.message };
+    return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : String(error) }
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }
