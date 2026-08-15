@@ -10,6 +10,8 @@ External producers had the opposite problem. dsh-weixin correctly created provid
 
 The browser plugin no longer owns image intake. The Harness composer already provides the expected attachment picker, thumbnail rail above the text field, paste and drag/drop support, validation, and one combined text-and-image submission. dsh-vision only contributes its settings card on the client.
 
+The settings card still needs a small same-origin host bridge because the client API has no generic settings mutation remote. This is shipped as the independent `settings-api` entry. It must not be coupled to an image upload route again: removing custom image intake must not remove plugin configuration.
+
 API Proxy performs exact-model modality admission before it stores browser attachments or wakes the Agent. DeepSeek models explicitly advertise `text` only, so `agent/pre-step` alone cannot receive a native upload. While dsh-vision is active, the preprocessor decorates exact-model metadata with the `image` input modality supplied by this plugin. It does not register an adapter, provider, model alias, or replacement route; provider and model identity remain unchanged. The decorator is removed with the plugin lifecycle.
 
 On the host, `vision-preprocessor` listens at `agent/pre-step` after downstream handlers. For every image-bearing user message it:

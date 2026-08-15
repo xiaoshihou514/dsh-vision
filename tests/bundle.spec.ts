@@ -28,6 +28,7 @@ describe('Harness bundle', () => {
     )
     expect(JSON.stringify(patch)).toContain('dsh-vision/qwen-backend')
     expect(JSON.stringify(patch)).toContain('dsh-vision/vision-preprocessor')
+    expect(JSON.stringify(patch)).toContain('dsh-vision/settings-api')
     expect(JSON.stringify(patch)).not.toContain('transformers-backend')
     expect(JSON.stringify(patch)).not.toContain('vision-adapter')
     expect(JSON.stringify(patch)).not.toContain('vision-upload')
@@ -41,6 +42,7 @@ describe('Harness bundle', () => {
     ])
     expect(manifest.exports).toHaveProperty('./qwen-backend')
     expect(manifest.exports).toHaveProperty('./vision-preprocessor')
+    expect(manifest.exports).toHaveProperty('./settings-api')
     expect(manifest.exports).not.toHaveProperty('./vision-upload')
     expect(manifest.exports?.['./client']).toEqual(
       expect.objectContaining({

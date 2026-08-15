@@ -4,5 +4,5 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 /** Browser services required by dsh-vision. */
 export declare const inject: readonly ['connection', 'slots']
 
-/** Register the image upload control and native plugin settings card. */
+/** Register the native plugin settings card; image intake stays with Harness. */
 export declare function apply(ctx: ClientContext): void

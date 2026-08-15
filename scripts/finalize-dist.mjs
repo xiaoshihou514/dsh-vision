@@ -16,6 +16,8 @@ const expected = [
   'index.js',
   'qwen-backend.d.ts',
   'qwen-backend.js',
+  'settings-api.d.ts',
+  'settings-api.js',
   'vision-preprocessor.d.ts',
   'vision-preprocessor.js',
   'vision-tool.d.ts',

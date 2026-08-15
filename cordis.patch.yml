@@ -14,5 +14,8 @@
     - id: vision-tool
       name: 'dsh-vision/vision-tool'
 
+    - id: vision-settings-api
+      name: 'dsh-vision/settings-api'
+
     - id: vision-preprocessor
       name: 'dsh-vision/vision-preprocessor'

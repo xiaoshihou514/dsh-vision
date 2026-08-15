@@ -136,8 +136,6 @@ export function VisionSettingsCard({ scope, api }: VisionSettingsCardInjected) {
     };
   }, [api.credentials]);
 
-  if (snapshot.status === "unavailable") return null;
-
   const value = snapshot.value ?? {};
   const read = (name: keyof VisionSettings): string =>
     draft[name] ?? text(value[name]);
@@ -221,6 +219,14 @@ export function VisionSettingsCard({ scope, api }: VisionSettingsCardInjected) {
             padding: "2px 0 12px",
           }}
         >
+          {snapshot.status === "unavailable" ? (
+            <p
+              role="status"
+              style={{ color: "var(--dsw-alias-label-error)", fontSize: 12 }}
+            >
+              设置服务不可用，请检查 dsh-vision 是否完整加载。
+            </p>
+          ) : null}
           <label style={field}>
             <span style={{ fontSize: 13, fontWeight: 500 }}>识图后端</span>
             <select

@@ -6,6 +6,7 @@
 - Add Zhipu's free GLM vision API as the default selectable backend, with secure WebUI credential setup and automatic free-model fallbacks; retain local Qwen as the private offline option.
 - Add a workspace-scoped `view_image` tool for text-only models.
 - Remove the synthetic vision provider and model copies. The plugin no longer changes the default model.
+- Keep plugin configuration available independently of the native image intake path.
 
 ## 0.1.0 - 2026-08-14
 

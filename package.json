@@ -26,6 +26,10 @@
       "types": "./lib/vision-preprocessor.d.ts",
       "default": "./lib/vision-preprocessor.js"
     },
+    "./settings-api": {
+      "types": "./lib/settings-api.d.ts",
+      "default": "./lib/settings-api.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json",
     "./client": {
