@@ -50,8 +50,8 @@ describe('Harness bundle', () => {
         default: './lib/client.js',
       }),
     )
-    expect(manifest.dsh?.client?.inject).toEqual(
-      expect.arrayContaining(['@deepseek-ai/dsh-client-ui-settings-plugins']),
-    )
+    // Harness owns the native dsh-vision settings card. Auto-injecting this
+    // package's legacy browser card would register the same slot id twice.
+    expect(manifest.dsh?.client).toBeUndefined()
   })
 })
