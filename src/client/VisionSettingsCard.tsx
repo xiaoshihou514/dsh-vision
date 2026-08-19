@@ -189,7 +189,7 @@ export function VisionSettingsCard({ scope, api }: VisionSettingsCardInjected) {
           <span
             style={{ color: "var(--dsw-alias-label-tertiary)", fontSize: 13 }}
           >
-            配置 GLM 云端识图或本地 Qwen3-VL
+            配置智谱云端识图或本地千问20亿参数小模型
           </span>
         </span>
         <svg
@@ -237,15 +237,15 @@ export function VisionSettingsCard({ scope, api }: VisionSettingsCardInjected) {
                 edit("backend", event.target.value);
               }}
             >
-              <option value="glm">GLM 云端</option>
-              <option value="qwen">Qwen3-VL 本地</option>
+              <option value="glm">智谱云端</option>
+              <option value="qwen">千问3本地小模型</option>
             </select>
           </label>
           {backend === "glm" ? (
             <>
               <div style={{ position: "relative" }}>
                 <Field
-                  label="API Key（仅写入凭据存储）"
+                  label="密钥"
                   type="password"
                   value={apiKey}
                   disabled={disabled}
@@ -281,7 +281,7 @@ export function VisionSettingsCard({ scope, api }: VisionSettingsCardInjected) {
                   target="_blank"
                   rel="noreferrer"
                 >
-                  前往智谱开放平台获取 API Key
+                  前往智谱开放平台获取密钥
                 </a>
               </p>
             </>
@@ -297,8 +297,8 @@ export function VisionSettingsCard({ scope, api }: VisionSettingsCardInjected) {
                     edit("modelPreset", event.target.value);
                   }}
                 >
-                  <option value="qwen3-vl-2b">Qwen3-VL 2B（推荐）</option>
-                  <option value="qwen2-vl-2b">Qwen2-VL 2B（兼容）</option>
+                  <option value="qwen3-vl-2b">千问3 20亿参数（推荐）</option>
+                  <option value="qwen2-vl-2b">千问2 20亿参数（兼容）</option>
                 </select>
               </label>
               <p
