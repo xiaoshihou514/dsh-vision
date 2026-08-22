@@ -23,8 +23,7 @@ export function apply(ctx: ClientContext): void {
     yield ctx.slots.register(
       {
         name: "settings.plugin.item",
-        id: "dsh-vision",
-        order: 25,
+        key: "dsh-vision",
         inject: (): VisionSettingsCardInjected => ({ scope: settings, api }),
       },
       VisionSettingsCard,

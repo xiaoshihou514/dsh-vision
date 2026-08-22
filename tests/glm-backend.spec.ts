@@ -1,6 +1,12 @@
 import { Context } from '@deepseek-ai/cordis'
 import type { StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { CredentialProvider, credentialRef } from '@deepseek-ai/dsh-credentials'
+import type {
+  CredentialKey,
+  CredentialRecord,
+  CredentialRecordEntry,
+  CredentialRecordInfo,
+} from '@deepseek-ai/dsh-credentials'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { glmVisionChat } from '../src/glm-backend.ts'
 import { QwenVisionBackend } from '../src/qwen-backend.ts'
@@ -12,6 +18,7 @@ const image = {
 
 class MemoryCredentials extends CredentialProvider {
   value = 'stored-key'
+  private records = new Map<CredentialKey, CredentialRecord>()
 
   resolve(): Promise<{ value: string; source: string }> {
     return Promise.resolve({ value: this.value, source: 'memory' })
@@ -28,6 +35,41 @@ class MemoryCredentials extends CredentialProvider {
 
   unset(): Promise<void> {
     this.value = ''
+    return Promise.resolve()
+  }
+
+  readRecord(key: CredentialKey): Promise<CredentialRecord | undefined> {
+    return Promise.resolve(this.records.get(key))
+  }
+
+  describeRecord(key: CredentialKey): Promise<CredentialRecordInfo> {
+    const record = this.records.get(key)
+    return Promise.resolve({
+      configured: record !== undefined,
+      ...(record === undefined ? {} : { kind: record.kind }),
+      writable: true,
+    })
+  }
+
+  listRecords(): Promise<readonly CredentialRecordEntry[]> {
+    return Promise.resolve(
+      [...this.records.entries()].map(([key, record]) => ({ key, kind: record.kind })),
+    )
+  }
+
+  modifyRecord(
+    key: CredentialKey,
+    mutate: (current: CredentialRecord | undefined) => Promise<CredentialRecord | undefined>,
+  ): Promise<CredentialRecord | undefined> {
+    return mutate(this.records.get(key)).then((next) => {
+      if (next === undefined) return this.records.get(key)
+      this.records.set(key, next)
+      return next
+    })
+  }
+
+  deleteRecord(key: CredentialKey): Promise<void> {
+    this.records.delete(key)
     return Promise.resolve()
   }
 }
